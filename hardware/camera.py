@@ -1,7 +1,14 @@
 import cv2
 import os
 import time
+import glob
+import numpy as np
+from PIL import Image, ImageDraw
 from threading import Thread
+
+def fetchClass(cameraType):
+    if cameraType.lower() == 'logi':
+        return Logi()
 
 class Camera(object):
     """
@@ -45,11 +52,12 @@ class Camera(object):
         self.camera = None
         self.streaming = False
         self.recording = False
+        self.path = None
 
-    def connect(self, id):
+    def connect(self, id="0"):
         raise NotImplementedError("camera.connect has not been implemented")
 
-    def takephoto(self):
+    def capture(self):
         raise NotImplementedError("camera.takephoto has not been implemented")
 
     def recordvideo(self):
@@ -59,9 +67,12 @@ class Camera(object):
         if not os.path.exists(file_path):
             os.makedirs(file_path)
         if type == "image":
-            file_name = file_path + str(int(time.time()*1000.0)) + ".jpg"
-            cv2.imwrite(file_name, media)
-            print("==> Image saved: %s" % file_name)
+            # Count number of jpg images to name files correctly.
+            numFiles = len(glob.glob1(file_path,"*.jpg"))
+            file_name = str(numFiles).zfill(8)
+            cv2.imwrite(file_path + file_name + ".jpg", media)
+            print("==> Image saved: %s" % file_name + ".jpg")
+            return file_name
 
     def livestream(self):
         if not self.connected:
@@ -79,6 +90,23 @@ class Camera(object):
         # Return thread to update livestream
         return Thread(target=self.fetchframe, args=(), daemon=True)
 
+    def projectPoint(self, point, camera, image, output):
+        matrix = np.loadtxt(camera)
+
+        # Project point to camera
+        v = (matrix @ point) # dot product
+        x = int(v[0] / v[2])
+        y = int(v[1] / v[2])
+
+        # Import an image from directory:
+        input_image = Image.open(image)
+
+        # Draw ellipse
+        draw = ImageDraw.Draw(input_image)
+        draw.ellipse((x-5, y-5, x+5, y+5), fill=(255,0,0,0))
+
+        # Saving the final output
+        input_image.save(output)
 
     def fetchframe(self):
         raise NotImplementedError("camera.fetchframe has not been implemented")
@@ -92,16 +120,26 @@ class Camera(object):
     def stop_recording(self):
         self.recording = False
 
+    def msg_connected(self):
+        print("==> Camera connected")
+        self.connected = True
+
+    def msg_disconnected(self):
+        print("==> Camera disconnected")
+        self.connected = False
+
 class Canon(Camera):
     pass
 
+
 # Camera function for traditional webcams
 class Logi(Camera):
-    def connect(self, camera_id):
-        if isinstance(camera_id[0], int):
-            camera_id = int(camera_id[0])
+    def connect(self,path="./captures/", camera_id=0):
+        try:
             self.camera = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
-        else:
+            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
+            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        except:
             print("==> Error: Cannot open webcam (ID: " + str(camera_id) + "), Please specify integer value")
             return False
         # Check camera connected
@@ -109,8 +147,8 @@ class Logi(Camera):
             print("==> Error: Cannot open webcam (ID: " + str(camera_id) + ")")
             return False
         else:
-            print("==> Succesfully connected")
-            self.connected = True
+            self.path = path
+            self.msg_connected()
 
     def fetchframe(self):
         (_, frame) = self.camera.read()
@@ -122,7 +160,7 @@ class Logi(Camera):
         self.disconnect()
         # Once finished, destroy windows
         cv2.destroyAllWindows()
-        print("==> Succesfully terminated live stream")
+        print("==> Camera auccesfully terminated live stream")
 
     def recordvideo(self, savepath=None):
         frames = []
@@ -133,11 +171,12 @@ class Logi(Camera):
                 frames.append(frame)
         return
 
-    def takephoto(self, savepath=None):
+    # Returns the name of the file it saved
+    def capture(self):
         (grabbed, frame) = self.camera.read()
         if grabbed:
-            if savepath == None: savepath = "./captures/"
-            self.savemedia(frame, savepath)
+            return self.savemedia(frame, self.path)
 
     def disconnect(self):
         self.camera.release()
+        self.msg_disconnected()

@@ -64,9 +64,9 @@ class calibrateCamera(object):
 
                 found += 1
                 # Draw and display the corners
-                '''img = cv2.drawChessboardCorners(img, (width,length), corners2,ret)
-                cv2.imshow('img',cv2.resize(img, (0,0), fx=0.3, fy=0.3))
-                cv2.waitKey(500)'''
+                img = cv2.drawChessboardCorners(img, (self.cb_w,self.cb_h), corners2,ret)
+                #cv2.imshow('img',img)
+                cv2.imwrite(self.output_destination + "/projected/" + str(i) + ".jpg", img)
             else:
                 print("==> Error: Unable to detect checkerboard at " + self.images[i])
                 unfound += 1
@@ -76,6 +76,9 @@ class calibrateCamera(object):
         # Extracting camera parameters
         retval, cameraMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None, flags=cv2.CALIB_RATIONAL_MODEL)
 
+        # Save intrinsic
+        np.savetxt(self.output_destination + "/txt/intrinsic.txt", cameraMatrix,  fmt='%.6f')
+
         # Create all of the necessary folders
         self.create_folders([self.output_destination, self.output_destination + "/txt/", self.output_destination + "/images/"])
 
@@ -83,8 +86,14 @@ class calibrateCamera(object):
         for i in range(0, len(self.images)):
             file_name = str(i).zfill(8)
             camera_matrix = np.append(cv2.Rodrigues(rvecs[i])[0],tvecs[i],axis=1)
+            # Calculate projection matrix
+            projection_matrix = np.dot(cameraMatrix, camera_matrix)
+            projection_matrix = np.append(projection_matrix, [[0, 0, 0, 1]], axis=0)
+            # Camera matrix
             camera_matrix = np.append(camera_matrix, [[0, 0, 0, 1]], axis=0)
+            # Save files
             np.savetxt(self.output_destination + "/txt/" + file_name + ".txt", camera_matrix,  fmt='%.6f')
+            np.savetxt(self.output_destination + "/projection/" + file_name + ".txt", projection_matrix,  fmt='%.6f')
             copyfile(self.images[i], self.output_destination + "/images/" + file_name + ".jpg")
 
 

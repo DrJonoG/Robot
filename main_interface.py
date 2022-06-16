@@ -43,7 +43,7 @@ class main_interface(object):
                 break
             elif len(input_split) > 1:
                 vars = input_split[1:]
-                cmd[func](vars)
+                cmd[func](vars)/00000000000
             else:
                 cmd[func]()
             #except:

@@ -1,0 +1,661 @@
+def close():
+  global _hidden_verificationVariable=0
+  set_standard_analog_input_domain(0, 1)
+  set_standard_analog_input_domain(1, 1)
+  set_tool_analog_input_domain(0, 1)
+  set_tool_analog_input_domain(1, 1)
+  set_analog_outputdomain(0, 0)
+  set_analog_outputdomain(1, 0)
+  set_input_actions_to_default()
+  step_count_b408e28c_a3bc_4679_9ae5_866a0861325e = 0.0
+  thread Step_Counter_Thread_07a35845_58bc_45d2_92ca_4165552ab8c0():
+    while (True):
+      step_count_b408e28c_a3bc_4679_9ae5_866a0861325e = step_count_b408e28c_a3bc_4679_9ae5_866a0861325e + 1.0
+      sync()
+    end
+  end
+  run Step_Counter_Thread_07a35845_58bc_45d2_92ca_4165552ab8c0()
+  set_tool_communication(False, 9600, 2, 1, 1.5, 3.5)
+  set_tool_output_mode(0)
+  set_tool_digital_output_mode(0, 1)
+  set_tool_digital_output_mode(1, 1)
+  set_tool_voltage(24)
+  set_tcp(p[0.0,0.0,0.0,0.0,0.0,0.0])
+  set_gravity([0.0, 0.0, 9.82])
+  set_safety_mode_transition_hardness(1)
+  set_target_payload(0.001000, [0.000000, 0.000000, 0.000000], [0.000000, 0.000000, 0.000000, 0.000000, 0.000000, 0.000000])
+  global gp_2=60
+  global gp_1=0
+  # begin: URCap Installation Node
+  #   Source: Remote TCP & Toolpath, 1.3.0.build16, Universal Robots A/S
+  #   Type: Remote TCP & Toolpath
+  mc_check_divergence = True
+  mc_lookahead = 0.03
+  mc_gain = 2000
+  mc_dt = 0.004
+  
+  mc_conv_tol_s = 0.001
+  mc_conv_loops = 100
+  
+  mc_ee_set_id = 2
+  
+  MC_GROUP_STANDBY = 0
+  MC_GROUP_STOPPING = 2
+  MC_GROUP_ERROR_STOP = 3
+  
+  MC_ERROR_PATHDIVERGED = 0
+  MC_ERROR_COLLISION = 1
+  MC_ERROR_JOINTLIMIT = 2
+  MC_ERROR_SINGULARITY = 4
+  MC_ERROR_PLANNINGFAILED = 16
+  MC_ERROR_DAEMONSTOPPED = 1024
+  MC_ERROR_SERVER_BUSY = 1025
+  MC_ERROR_NOT_INITIALIZED = 2000
+  
+  MC_TOOLPATH_ERROR_NONE = 0
+  MC_TOOLPATH_ERROR_FILELOAD = 1
+  MC_TOOLPATH_ERROR_PARSE = 2
+  MC_TOOLPATH_ERROR_EMPTYTOOLPATH = 3
+  MC_TOOLPATH_ERROR_UNSUPPORTEDTYPE = 4
+  
+  MC_GROUP_STATUS_INPUT = 24
+  MC_CURRENT_MOTION_ID_INPUT = 25
+  MC_ERROR_CODE_INPUT = 26
+  MC_DIGITAL_OUTPUTS_INPUT = 27
+  MC_JOINT_VALUE_INPUT = 24
+  MC_WATCHDOG_INPUT = 30
+  MC_PATH_SPEED_INPUT = 31
+  MC_SPEEDFACTOR_OUTPUT = 24
+  
+  mc_last_watchdog = 0
+  mc_watchdog_counter = 0
+  mc_watchdog_counter_limit = 100
+  
+  mc_last_motion_id = -1
+  mc_group_status = MC_GROUP_STOPPING
+  mc_server_started = False
+  mc_rtcp_moving = False
+  mc_debug_msg = False
+  mc_gmm_initialized = False
+  mc_last_digital_outputs = 0
+  
+  def mc_initialize(mode, tcp, doc=6):
+  	mc_check_busy()
+  
+  	if (mode == 0 and doc == 6):
+  		mc_ee_set_id = 0
+  	end
+  
+  	if (mode == 1 and doc == 6):
+  		mc_ee_set_id = 2
+  	end
+  
+  	if (mode == 0 and doc == 5):
+  		mc_ee_set_id = 1
+  	end
+  
+  	if (mode == 1 and doc == 5):
+  		mc_ee_set_id = 3
+  	end
+  
+  	mc_initialize_internal(tcp)
+  end
+  
+  def mc_initialize_internal(tcp):
+  	if (mc_server_started == False):
+  		global mc_server = rpc_factory("xmlrpc", "127.0.0.1:7828")
+  		mc_server_started = True
+  	end
+  
+  	mc_server.setDataStoreBoolean("IS_ON", "/robot/check_divergence", mc_check_divergence)
+  	mc_server.reset()
+  	mc_group_status = MC_GROUP_STANDBY
+  	mc_set_speed_factor(1.0)
+  	mc_server.setKinTransform(mc_ee_set_id, 0, tcp)
+  	mc_gmm_initialized = False
+  end
+  
+  def mc_check_busy():
+  	enter_critical
+  	if (mc_rtcp_moving == False):
+  		mc_rtcp_moving = True
+  	else:
+  		mc_error_stop("", "", MC_ERROR_SERVER_BUSY)
+  	end
+  	exit_critical
+  end
+  
+  def mc_add_linear(pose, a, v, r):
+  	mc_check_ready()
+  	ee_id = 0
+  	buffer_mode = "BLENDING_NEXT"
+  	transition_mode = "CORNER_DISTANCE"
+  	id = mc_server.moveLinearAbsolute(pose, mc_ee_set_id, ee_id, v, a, buffer_mode, transition_mode, r)
+  
+  	if (id == -1):
+  		mc_error_stop("Compute node returned ID ", id)
+  	end
+  
+  	mc_last_motion_id = id
+  
+  	return id
+  end
+  
+  def mc_add_circular(pose_via, pose_to, a, v, r, mode = 0):
+  	mc_check_ready()
+  	ee_id = 0
+  	buffer_mode = "BLENDING_NEXT"
+  	transition_mode = "CORNER_DISTANCE"
+  	id = mc_server.moveCircularBorderAbsolute(pose_via, pose_to, mode, mc_ee_set_id, ee_id, v, a, buffer_mode, transition_mode, r)
+  
+  	if (id == -1):
+  		mc_error_stop("Compute node returned ID ", id)
+  	end
+  
+  	mc_last_motion_id = id
+  
+  	return id
+  end
+  
+  def mc_add_path(path_id, a, v, r):
+  	mc_check_ready()
+  	ee_id = 0
+  	buffer_mode = "BLENDING_NEXT"
+  	transition_mode = "CORNER_DISTANCE"
+  	id = mc_server.movePath(path_id, mc_ee_set_id, ee_id, v, a, buffer_mode, transition_mode, r)
+  
+  	if (id == -1):
+  		result = mc_server.getErrorCode()
+  		mc_toolpath_error_stop(result[0], result[1])
+  	end
+  
+  	mc_last_motion_id = id
+  
+  	return id
+  end
+  
+  def mc_load_path(nc_file, use_feedrate = False):
+  	id = mc_server.loadPath(nc_file, use_feedrate)
+  
+  	if (id < 0):
+  		result = mc_server.getErrorCode()
+  		mc_toolpath_error_stop(result[0], result[1])
+  	end
+  
+  	return id
+  end
+  
+  def mc_get_target_rtcp_speed():
+  	return read_input_float_register(MC_PATH_SPEED_INPUT)
+  end
+  
+  def mc_check_ready():
+  	if mc_group_status != MC_GROUP_STANDBY:
+  		mc_error_stop("", "", MC_ERROR_NOT_INITIALIZED)
+  	end
+  end
+  
+  def mc_set_pcs(pcs):
+  	ee_id = 0
+  	mc_server.setCoordinateTransform(mc_ee_set_id, ee_id, pcs, "ABORTING")
+  end
+  
+  def mc_set_digital_outputs():
+  	current_do = read_input_integer_register(MC_DIGITAL_OUTPUTS_INPUT)
+  	current_do_bin = integer_to_binary_list(current_do)
+  	last_do_bin = integer_to_binary_list(mc_last_digital_outputs)
+  	loopcounter = 0
+  	while (loopcounter < 4):
+  		value_bit = loopcounter * 6
+  		port_bit_0 = value_bit + 1
+  		port_bit_1 = value_bit + 2
+  		port_bit_2 = value_bit + 3
+  		port_bit_3 = value_bit + 4
+  		port_bit_4 = value_bit + 5
+  		last_port = binary_list_to_integer([last_do_bin[port_bit_0], last_do_bin[port_bit_1], last_do_bin[port_bit_2], last_do_bin[port_bit_3], last_do_bin[port_bit_4]])
+  		current_port = binary_list_to_integer([current_do_bin[port_bit_0], current_do_bin[port_bit_1], current_do_bin[port_bit_2], current_do_bin[port_bit_3], current_do_bin[port_bit_4]])
+  		if (current_port != 0 and (current_port != last_port or current_do_bin[value_bit] != last_do_bin[value_bit])):
+  			if (current_port <= 8):
+  				set_standard_digital_out(current_port - 1, current_do_bin[value_bit])
+  			elif (current_port <= 16):
+  				set_configurable_digital_out(current_port - 9, current_do_bin[value_bit])
+  			else:
+  				set_tool_digital_out(current_port - 17, current_do_bin[value_bit])
+  			end
+  		end
+  		loopcounter = loopcounter + 1
+  	end
+  	mc_last_digital_outputs = current_do
+  end
+  
+  def mc_run_motion(id=-1):
+  	if (id == -1):
+  		id = mc_last_motion_id
+  	end
+  
+  	mc_debugMsg("Waiting for ID ", id)
+  
+  	if (mc_gmm_initialized == False):
+  		mc_initialize_gmm()
+  	end
+  
+  	mc_current_motion_id = read_input_integer_register(MC_CURRENT_MOTION_ID_INPUT)
+  	mc_group_status = read_input_integer_register(MC_GROUP_STATUS_INPUT)
+  	joint_targets = get_actual_joint_positions()
+  	while (mc_current_motion_id <= id and mc_current_motion_id != -2 and mc_group_status != MC_GROUP_STOPPING and mc_group_status != MC_GROUP_ERROR_STOP):
+  		mc_current_motion_id = read_input_integer_register(MC_CURRENT_MOTION_ID_INPUT)
+  		mc_group_status = read_input_integer_register(MC_GROUP_STATUS_INPUT)
+  
+  		joint_targets = mc_get_joint_targets(joint_targets)
+  		servoj(joint_targets, t = mc_dt, lookahead_time = mc_lookahead, gain = mc_gain)
+  
+  		mc_set_digital_outputs()
+  
+  		mc_check_watchdog()
+  	end
+  
+  	if (mc_group_status == MC_GROUP_STOPPING or mc_group_status == MC_GROUP_ERROR_STOP):
+  		stopj(45)
+  
+  		mc_debugMsg("Stopping due to error after ID ", id)
+  
+  		mc_server.setDataStoreBoolean("IS_RTCP_RUNNING", "/group_motion_manager", False)
+  
+  		error_code = read_input_integer_register(MC_ERROR_CODE_INPUT)
+  		mc_error_stop("Compute node returned group status ", mc_group_status, error_code)
+  
+  		mc_rtcp_moving = False
+  		mc_group_status = MC_GROUP_STOPPING
+  	end
+  
+  	if (id == mc_last_motion_id):
+  		mc_debugMsg("Stopping after ID ", id)
+  		mc_check_convergence(joint_targets)
+  
+  		mc_server.setDataStoreBoolean("IS_RTCP_RUNNING", "/group_motion_manager", False)
+  
+  		mc_rtcp_moving = False
+  		mc_group_status = MC_GROUP_STOPPING
+  	end
+  
+  	mc_debugMsg("Completed ID ", id)
+  end
+  
+  def mc_set_speed_factor(s):
+  	write_output_float_register(MC_SPEEDFACTOR_OUTPUT, s)
+  end
+  
+  def mc_initialize_gmm():
+  	mc_current_motion_id = read_input_integer_register(MC_CURRENT_MOTION_ID_INPUT)
+  	while (mc_current_motion_id != -1):
+  		mc_current_motion_id = read_input_integer_register(MC_CURRENT_MOTION_ID_INPUT)
+  		sleep(mc_dt)
+  		mc_check_watchdog()
+  	end
+  
+  	mc_server.setDataStoreBoolean("IS_RTCP_RUNNING", "/group_motion_manager", True)
+  
+  	while (mc_current_motion_id == -1):
+  		mc_current_motion_id = read_input_integer_register(MC_CURRENT_MOTION_ID_INPUT)
+  		sleep(mc_dt)
+  		mc_check_watchdog()
+  	end
+  
+  	mc_gmm_initialized = True
+  end
+  
+  def mc_check_convergence(joint_targets):
+  	loopcounter = 0
+  	converged = False
+  	while (converged == False and loopcounter < mc_conv_loops):
+  
+  		joint_targets = mc_get_joint_targets(joint_targets)
+  		ur_targets = get_target_joint_positions()
+  		joint_speeds = get_actual_joint_speeds()
+  
+  		position_converged = joint_targets[0] == ur_targets[0] and joint_targets[1] == ur_targets[1] and joint_targets[2] == ur_targets[2] and joint_targets[3] == ur_targets[3] and joint_targets[4] == ur_targets[4] and joint_targets[5] == ur_targets[5]
+  		speed_converged = joint_speeds[0] <= mc_conv_tol_s and joint_speeds[1] <= mc_conv_tol_s and joint_speeds[2] <= mc_conv_tol_s and joint_speeds[3] <= mc_conv_tol_s and joint_speeds[4] <= mc_conv_tol_s and joint_speeds[5] <= mc_conv_tol_s
+  		converged = position_converged and speed_converged
+  
+  		servoj(joint_targets, t = mc_dt, lookahead_time = mc_lookahead, gain = mc_gain)
+  
+  		loopcounter = loopcounter + 1
+  	end
+  
+  	mc_debugMsg("Convergence loop count: ", loopcounter)
+  end
+  
+  def mc_check_watchdog():
+  	current_watchdog = read_input_float_register(MC_WATCHDOG_INPUT)
+  
+  	if (current_watchdog > mc_last_watchdog):
+  		mc_last_watchdog = current_watchdog
+  		mc_watchdog_counter = 0
+  	else:
+  		mc_watchdog_counter = mc_watchdog_counter + 1
+  		if (mc_watchdog_counter > mc_watchdog_counter_limit):
+  			mc_error_stop("", "", MC_ERROR_DAEMONSTOPPED)
+  		end
+  	end
+  end
+  
+  def mc_get_joint_targets(joint_targets):
+  	joint_targets[0] = read_input_float_register(MC_JOINT_VALUE_INPUT)
+  	joint_targets[1] = read_input_float_register(MC_JOINT_VALUE_INPUT + 1)
+  	joint_targets[2] = read_input_float_register(MC_JOINT_VALUE_INPUT + 2)
+  	joint_targets[3] = read_input_float_register(MC_JOINT_VALUE_INPUT + 3)
+  	joint_targets[4] = read_input_float_register(MC_JOINT_VALUE_INPUT + 4)
+  	joint_targets[5] = read_input_float_register(MC_JOINT_VALUE_INPUT + 5)
+  	return joint_targets
+  end
+  
+  def mc_error_stop(msg, param="", error_code=MC_ERROR_PLANNINGFAILED):
+  	if (msg != ""):
+  		textmsg(msg, param)
+  	end
+  
+  	textmsg("Error code: ", error_code)
+  	error_msg = mc_getErrorMessage(error_code)
+  	textmsg(error_msg)
+  
+  	popup(error_msg, title="Remote TCP", error=True, blocking=False)
+  	halt
+  end
+  
+  def mc_toolpath_error_stop(error_code, param):
+  	msg = mc_getToolpathMessage(error_code)
+  	textmsg(msg + " - Line: ", param)
+  
+  	popup(msg, title="Toolpath Validation", error=True, blocking=True)
+  	halt
+  end
+  
+  def mc_debugMsg(msg, param=""):
+  	if (mc_debug_msg == True):
+  		textmsg(msg, param)
+  	end
+  end
+  def mc_getErrorMessage(error_code):
+  	if error_code == MC_ERROR_PATHDIVERGED:
+  		return "<html>Robot cannot maintain tool speed. You may avoid this issue by:<ul><li>reducing the tool speed;</li><li>avoiding sharp corners;</li><li>staying away from singularities.</li></ul></html>"
+  	elif error_code == MC_ERROR_COLLISION:
+  		return "Robot is in collision."
+  	elif error_code == MC_ERROR_JOINTLIMIT:
+  		return "Robot is at a joint limit."
+  	elif error_code == MC_ERROR_SINGULARITY:
+  		return "Robot is at a singularity."
+  	elif error_code == MC_ERROR_DAEMONSTOPPED:
+  		return "The controller stopped."
+  	elif error_code == MC_ERROR_SERVER_BUSY:
+  		return "Another Remote TCP Move node is running."
+  	elif error_code == MC_ERROR_NOT_INITIALIZED:
+  		return "Group motion manager is not initialized."
+  	else:
+  		return "Motion planning failed."
+  	end
+  end
+  
+  def mc_getToolpathMessage(message_code):
+  	if message_code == MC_TOOLPATH_ERROR_NONE:
+  		return "Toolpath file is valid."
+  	elif message_code == MC_TOOLPATH_ERROR_FILELOAD:
+  		return "File cannot be loaded."
+  	elif message_code == MC_TOOLPATH_ERROR_PARSE:
+  		return "Parsing error"
+  	elif message_code == MC_TOOLPATH_ERROR_EMPTYTOOLPATH:
+  		return "Empty toolpath"
+  	elif message_code == MC_TOOLPATH_ERROR_UNSUPPORTEDTYPE:
+  		return "Unsupported type"
+  	else:
+  		return "Unknown toolpath validation error"
+  	end
+  end
+  # end: URCap Installation Node
+  # begin: URCap Installation Node
+  #   Source: RG - On Robot, 1.10.1, OnRobot A/S
+  #   Type: RG Configuration
+  set_tool_output_mode(0)
+  set_tool_digital_output_mode(0,1)
+  set_tool_digital_output_mode(1,1)
+  global measure_width=0
+  global grip_detected=False
+  global lost_grip=False
+  global zsysx=0
+  global zsysy=0
+  global zsysz=0.06935
+  global zsysm=0.7415
+  global zmasx=0
+  global zmasy=-0
+  global zmasz=0.18659
+  global zslax=0
+  global zslay=0
+  global zslaz=0
+  global zmasm=0
+  global zslam=0
+  global zslatcp=p[0,0,0,0,0,0]
+  global zmastcp=p[0,0,0.18659,0,-0,-3.14159]
+  thread lost_grip_thread():
+  while True:
+  set_tool_voltage(24)
+  	if True ==get_digital_in(9):
+  		sleep(0.024)
+  		if True == grip_detected:
+  			if False == get_digital_in(8):
+  				grip_detected=False
+  				lost_grip=True
+  			end
+  		end
+  	set_tool_analog_input_domain(0, 1)
+  	set_tool_analog_input_domain(1, 1)
+  	zscale = (get_analog_in(2)-0.026)/2.5900013
+  	zangle = zscale*1.57079633+-0.08726646
+  	zwidth = 5.0+110*sin(zangle)
+  	global measure_width = (floor(zwidth*10))/10-9.2
+  	end
+  	sync()
+  end
+  end
+  lg_thr = run lost_grip_thread()
+  def RG2(target_width=110, target_force=40, payload=0.0, set_payload=False, depth_compensation=False, slave=False):
+  	set_tcp(p[0,0,0.18659,0,-0,-3.14159])
+  	grip_detected=False
+  	if slave:
+  		slave_grip_detected=False
+  	else:
+  		master_grip_detected=False
+  	end
+  	timeout = 0
+  	timeout_limit = 3000000
+  	while get_digital_in(9) == False:
+  	  if timeout > timeout_limit:
+  	    break
+  	  end
+  	  timeout = timeout+1
+  	  sync()
+  	end
+  	def bit(input):
+  	  msb=65536
+  	  local i=0
+  	  local output=0
+  	  while i<17:
+  	    set_digital_out(8,True)
+  	    if input>=msb:
+  	      input=input-msb
+  	      set_digital_out(9,False)
+  	    else:
+  	      set_digital_out(9,True)
+  	    end
+  	    if get_digital_in(8):
+  	      out=1
+  	    end
+  	    sync()
+  	    set_digital_out(8,False)
+  	    sync()
+  	    input=input*2
+  	    output=output*2
+  	    i=i+1
+  	  end
+  	  return output
+  	end
+  	target_width=target_width+9.2
+  	if target_force>40:
+  	target_force=40
+  	end
+  	if target_force<3:
+  	target_force=3
+  	end
+  	if target_width>110:
+  	target_width=110
+  	end
+  	if target_width<0:
+  	target_width=0
+  	end
+  	rg_data=floor(target_width)*4
+  	rg_data=rg_data+floor(target_force/2)*4*111
+  	rg_data=rg_data+32768
+  	if slave:
+  	rg_data=rg_data+16384
+  	end
+  	bit(rg_data)
+  	if slave==False:
+  	t_w_rg=pose_trans(get_actual_tool_flange_pose(), zmastcp)
+  	end
+  	if slave:
+  	t_w_rg=pose_trans(get_actual_tool_flange_pose(), zslatcp)
+  	end
+  	t_rg_w=pose_inv(t_w_rg)
+  	if depth_compensation:
+  	finger_length = 55.0/1000
+  	finger_heigth_disp = 5.0/1000
+  	center_displacement = 7.5/1000
+  
+  	start_pose = get_forward_kin()
+  	set_analog_inputrange(2, 1)
+  	zscale = (get_analog_in(2)-0.026)/2.5900013
+  	zangle = zscale*1.57079633+-0.08726646
+  	zwidth = 5.0+110*sin(zangle)
+  
+  	start_depth = cos(zangle)*finger_length
+  
+  	sleep(0.016)
+  	timeout = 0
+  	while get_digital_in(9) == True:
+  	  timeout=timeout+1
+  	  sleep(0.008)
+  	  if timeout > 20:
+  	    break
+  	  end
+  	end
+  	timeout = 0
+  	timeout_limit = 750000
+  	compensation_depth = 0
+  	while get_digital_in(9) == False:
+  	  zscale = (get_analog_in(2)-0.026)/2.5900013
+  	  zangle = zscale*1.57079633+-0.08726646
+  	  zwidth = 5.0+110*sin(zangle)
+  	  measure_depth = cos(zangle)*finger_length
+  	  compensation_depth = (measure_depth - start_depth)
+  	  target_pose =pose_add(start_pose,pose_trans(pose_trans(t_w_rg, p[0,0,-compensation_depth,0,0,0]),t_rg_w))
+  
+  	  if timeout > timeout_limit:
+  	    break
+  	  end
+  	  timeout=timeout+1
+  	#  servoj(get_inverse_kin(target_pose), t=0.008, lookahead_time=0.033, gain=1500)
+  	#  textmsg(point_dist(target_pose, get_forward_kin()))
+  	#end
+  	#textmsg("end gripper move!!!!!")
+  	#nspeedthr = 0.001
+  	#nspeed = norm(get_actual_tcp_speed())
+  	#while nspeed > nspeedthr:
+  	#  servoj(get_inverse_kin(target_pose), t=0.008, lookahead_time=0.033, gain=1500)
+  	#  nspeed = norm(get_actual_tcp_speed())
+  	#  textmsg(point_dist(target_pose, get_forward_kin()))
+  	#end
+  	servoj(get_inverse_kin(target_pose),0,0,0.008,0.01,2000)
+  	if point_dist(target_pose, get_forward_kin()) > 0.005:
+  	popup("Lower grasping force or max width",title="RG-lag threshold exceeded", warning=False, error=False, blocking=False)
+  	end
+  	end
+  	act_comp_pose = p[0,0,0,0,0,0]
+  	while norm(act_comp_pose) < norm(compensation_depth)-0.0002:
+  	servoj(get_inverse_kin(target_pose),0,0,0.008,0.01,2000)
+  	act_comp_pose = pose_trans(pose_inv(start_pose),get_forward_kin())
+  	end
+  	stopj(2)
+  	end
+  	if depth_compensation==False:
+  	timeout = 0
+  	timeout_count=20*0.008/0.002
+  	while get_digital_in(9) == True:
+  	  timeout = timeout+1
+  	  sync()
+  	  if timeout > timeout_count:
+  	    break
+  	  end
+  	end
+  	timeout = 0
+  	timeout_limit = 3000000
+  	while get_digital_in(9) == False:
+  	  timeout = timeout+1
+  	  sync()
+  	  if timeout > timeout_limit:
+  	    break
+  	  end
+  	end
+  	end
+  	sleep(0.024)
+  	if set_payload:
+  	if slave:
+  	if get_analog_in(3)/0.5180003 < 1.42:
+  	zslam=0
+  	else:
+  	zslam=payload
+  	end
+  	else:
+  	if get_digital_in(8) == False:
+  	zmasm=0
+  	else:
+  	zmasm=payload
+  	end
+  	end
+  	zload=zmasm+zslam+zsysm
+  	set_payload(zload,[(zsysx*zsysm+zmasx*zmasm+zslax*zslam)/zload,(zsysy*zsysm+zmasy*zmasm+zslay*zslam)/zload,(zsysz*zsysm+zmasz*zmasm+zslaz*zslam)/zload])
+  	end
+  	master_grip_detected=False
+  	master_lost_grip=False
+  	slave_grip_detected=False
+  	slave_lost_grip=False
+  	if True == get_digital_in(8):
+  		master_grip_detected=True
+  	end
+  	if get_analog_in(3)/0.5180003>1.97:
+  		slave_grip_detected=True
+  	end
+  	grip_detected=False
+  	lost_grip=False
+  	if True == get_digital_in(8):
+  		grip_detected=True
+  	end
+  	zscale = (get_analog_in(2)-0.026)/2.5900013
+  	zangle = zscale*1.57079633+-0.08726646
+  	zwidth = 5.0+110*sin(zangle)
+  	global measure_width = (floor(zwidth*10))/10-9.2
+  	if slave:
+  	slave_measure_width=measure_width
+  	else:
+  	master_measure_width=measure_width
+  	end
+  	return grip_detected
+  end
+  set_tool_voltage(24)
+  set_tcp(p[0,0,0.18659,0,-0,-3.14159])
+  # end: URCap Installation Node
+  $ 1 "Robot Program"
+  # begin: URCap Program Node
+  #   Source: RG - On Robot, 1.10.1, OnRobot A/S
+  #   Type: RG2
+  $ 2 "RG2(0)"
+  RG2(70,20,0.0,True,False,False)
+  # end: URCap Program Node
+end

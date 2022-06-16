@@ -35,6 +35,9 @@ class RobotBase(object):
     def disconnect(self):
         raise NotImplementedError("robot.disconnect has not been implemented")
 
+    def angles_to_transformation(self):
+        raise NotImplementedError("robot.get_position has not been implemented")
+
     def get_position(self):
         raise NotImplementedError("robot.get_position has not been implemented")
 
@@ -58,7 +61,6 @@ class RobotBase(object):
 
         # Complete
         matrix = np.column_stack((rotationMatrix, np.transpose(T)))
-        matrix = np.vstack([matrix, [0,0,0,1]])
         return matrix
 
     def matrix_from_axis_angle(self, a1, normalised=True):
@@ -119,7 +121,7 @@ class RobotBase(object):
 
     def msg_disconnected(self):
         print("==> Robot disconnected")
-        self.connected = False
+        self.connectedd = False
 
 
 class MobileRobot(RobotBase):
@@ -132,13 +134,13 @@ class UR(RobotBase):
         self.position = None
         self.s = None
 
-    def connect(self, host, port, path=None):
+    def connect(self, host, port, path):
         try:
             self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.s.connect((host, port))
             # RTDE connect
-            #self.rtde_c = RTDEControl(host)
-            #self.rtde_r = RTDEReceive(host)
+            self.rtde_c = RTDEControl(host)
+            self.rtde_r = RTDEReceive(host)
             # Wait 0.05 seconds because the robot communication speed is 125 Hz = 0.008 seconds
             time.sleep(0.05)
             # Connected
@@ -153,16 +155,32 @@ class UR(RobotBase):
 
 
     def home(self):
-        self.move([0,-1.57,0,-1.57,0,0])
+        self.send("movej([0,-1.57,0,-1.57,0,0], a=1.0, v=0.4)" + "\n")
+        time.sleep(10)
 
-    def move(self, position, wait=True):
-        self.rtde_c.moveJ(position, 0.8, 0.8)
-        # wait for move to finish
-        if wait:
-            while not self.rtde_c.isSteady():
-                time.sleep(0.2)
-        # pause before continuation
-        time.sleep(1)
+    '''
+        Move to position (linear in joint-space) When using this command, the
+        robot must be at standstill or come from a movej og movel with a
+        blend. The speed and acceleration parameters controls the trapezoid
+        speed profile of the move. The $t$ parameters can be used in stead to
+        set the time for this move. Time setting has priority over speed and
+        acceleration settings. The blend radius can be set with the $r$
+        parameters, to avoid the robot stopping at the point. However, if he
+        blend region of this mover overlaps with previous or following regions,
+        this move will be skipped, and an 'Overlapping Blends' warning
+        message will be generated.
+        Parameters:
+        q:    joint positions (Can also be a pose)
+        a:    joint acceleration of leading axis [rad/s^2]
+        v:    joint speed of leading axis [rad/s]
+        t:    time [S]
+        r:    blend radius [m]
+        wait: function return when movement is finished
+        pose: target pose
+    '''
+    def movej(self, position,seconds=0):
+        self.send("movej([" + position + "], a=1.0, v=0.4)" + "\n")
+        time.sleep(seconds)
 
     def send(self, command):
         if not self.connected:
@@ -173,9 +191,30 @@ class UR(RobotBase):
         except:
             raise ValueError('Unable to execute ' + command)
 
+
     def disconnect(self):
         self.msg_disconnected()
         self.s.close()
+
+    # Open the gripper - This is a temporary hack to open gripper.
+    def open(self):
+        f = open("C:/Users/jonat/OneDrive/Documents/Robot/hardware/open.script", "r")
+        l = f.read(1024)
+
+        while(l):
+        	self.send(l)
+        	l = f.read(1024)
+        time.sleep(0.2)
+
+    # Close the gripper - This is a temporary hack to close gripper.
+    def close(self):
+        f = open("C:/Users/jonat/OneDrive/Documents/Robot/hardware/close.script", "r")
+        l = f.read(1024)
+
+        while(l):
+        	self.send(l)
+        	l = f.read(1024)
+        time.sleep(0.2)
 
     def get_position(self):
         return rtde_r.getActualQ()
@@ -184,17 +223,11 @@ class UR(RobotBase):
         return np.array(self.rtde_c.getForwardKinematics())
 
     def manual_positions(self):
-        print("Record positions, enter to log position, q to quit.")
-        while True:    # infinite loop
-            # Turn on manual drive
-            self.rtde_c.teachMode()
-            time.sleep(0.2)
-            # Wait for input
-            n = input("")
-            if n == "q":
-                self.rtde_c.stopScript()
-                break
-            # Joint angles
-            print(self.rtde_r.getActualQ())
-
-            time.sleep(0.2)
+        # Turn on manual drive
+        rtde_c.teachMode()
+        # Wait for input
+        input()
+        # Joint angles
+        print(rtde_r.getActualQ())
+        # Stop the RTDE control script which also turns off teachmode
+        rtde_c.stopScript()
