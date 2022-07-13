@@ -22,6 +22,8 @@ class calibrateCamera(object):
     # Output path is the same as input, the output is a series of transformation matrices
     def calibrate(self):
         np.set_printoptions(precision=5, suppress=True)
+        # Create necessary folders
+        self.create_folders([self.image_source, self.output_destination, self.output_destination + '/axyb/', self.output_destination + '/projection/', self.output_destination + '/projected/'])
 
         print("==> Performing camera calibration")
 
@@ -61,12 +63,13 @@ class calibrateCamera(object):
 
                 corners2 = cv2.cornerSubPix(gray,corners,(14,14),(-1,-1),criteria)
                 imgpoints.append(corners2)
-
                 found += 1
+
                 # Draw and display the corners
                 img = cv2.drawChessboardCorners(img, (self.cb_w,self.cb_h), corners2,ret)
-                #cv2.imshow('img',img)
-                cv2.imwrite(self.output_destination + "/projected/" + str(i) + ".jpg", img)
+
+                # Write to file
+                #cv2.imwrite(self.output_destination + "/projected/" + str(i) + ".jpg", img)
             else:
                 print("==> Error: Unable to detect checkerboard at " + self.images[i])
                 unfound += 1
@@ -77,10 +80,7 @@ class calibrateCamera(object):
         retval, cameraMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None, flags=cv2.CALIB_RATIONAL_MODEL)
 
         # Save intrinsic
-        np.savetxt(self.output_destination + "/txt/intrinsic.txt", cameraMatrix,  fmt='%.6f')
-
-        # Create all of the necessary folders
-        self.create_folders([self.output_destination, self.output_destination + "/txt/", self.output_destination + "/images/"])
+        np.savetxt(self.output_destination + "/axyb/intrinsic.txt", cameraMatrix,  fmt='%.6f')
 
         # Export the camera matrices
         for i in range(0, len(self.images)):
@@ -92,9 +92,9 @@ class calibrateCamera(object):
             # Camera matrix
             camera_matrix = np.append(camera_matrix, [[0, 0, 0, 1]], axis=0)
             # Save files
-            np.savetxt(self.output_destination + "/txt/" + file_name + ".txt", camera_matrix,  fmt='%.6f')
+            np.savetxt(self.output_destination + "/axyb/A" + file_name + ".txt", camera_matrix,  fmt='%.6f')
             np.savetxt(self.output_destination + "/projection/" + file_name + ".txt", projection_matrix,  fmt='%.6f')
-            copyfile(self.images[i], self.output_destination + "/images/" + file_name + ".jpg")
+            #copyfile(self.images[i], self.output_destination + "/images/" + file_name + ".jpg")
 
 
     def adjust_gamma(self, image, gamma=1.0):

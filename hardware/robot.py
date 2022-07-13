@@ -5,13 +5,13 @@ import math
 import socket
 import time
 
-def fetchClass(robotType):
+def fetchClass(robotType, config):
     if robotType.lower() == 'ur5' or robotType.lower() == 'ur10' or robotType.lower() == 'ur':
-        return UR()
+        return UR(config)
 
 # Base class of the robot
 class RobotBase(object):
-    def __init__(self):
+    def __init__(self, config=None):
         self.connected = False
         self.moving = False
         self.position = None
@@ -19,6 +19,7 @@ class RobotBase(object):
         self.path = None
         self.rtde_c = None
         self.rtde_r = None
+        self.config = config
 
     def connect(self, host, port):
         raise NotImplementedError("robot.connect has not been implemented")
@@ -126,30 +127,34 @@ class MobileRobot(RobotBase):
     pass
 
 class UR(RobotBase):
-    def __init__(self):
+    def __init__(self, config):
         self.connected = False
         self.moving = False
         self.position = None
         self.s = None
+        self.config = config
 
-    def connect(self, host, port, path=None):
-        try:
-            self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            self.s.connect((host, port))
-            # RTDE connect
-            #self.rtde_c = RTDEControl(host)
-            #self.rtde_r = RTDEReceive(host)
-            # Wait 0.05 seconds because the robot communication speed is 125 Hz = 0.008 seconds
-            time.sleep(0.05)
-            # Connected
-            self.msg_connected()
-            self.path = path
-        except socket.error as msg:
-            self.connected = False
-            print("Caught exception socket.error : %s" % msg)
-        except TypeError as msg:
-            self.connected = False
-            print("Type Error: %s" % msg)
+    def connect(self):
+        if(self.connected):
+            return True
+        else:
+            try:
+                self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.s.connect((self.config['host'], int(self.config['port'])))
+                # RTDE connect
+                self.rtde_c = RTDEControl(self.config['host'])
+                self.rtde_r = RTDEReceive(self.config['host'])
+                # Wait 0.05 seconds because the robot communication speed is 125 Hz = 0.008 seconds
+                time.sleep(0.05)
+                # Connected
+                self.msg_connected()
+                self.path = self.config['save_path']
+            except socket.error as msg:
+                self.connected = False
+                print("Caught exception socket.error : %s" % msg)
+            except TypeError as msg:
+                self.connected = False
+                print("Type Error: %s" % msg)
 
 
     def home(self):
@@ -183,6 +188,28 @@ class UR(RobotBase):
     def get_kinematics(self):
         return np.array(self.rtde_c.getForwardKinematics())
 
+    # Open the gripper - This is a temporary hack to open gripper.
+    def open(self):
+        print("==> Opening gripper")
+        f = open("./hardware/open.script", "r")
+        l = f.read(1024)
+
+        while(l):
+        	self.send(l)
+        	l = f.read(1024)
+        time.sleep(0.2)
+
+    # Close the gripper - This is a temporary hack to close gripper.
+    def close(self):
+        print("==> Closing gripper")
+        f = open("./hardware/close.script", "r")
+        l = f.read(1024)
+
+        while(l):
+        	self.send(l)
+        	l = f.read(1024)
+        time.sleep(0.2)
+
     def manual_positions(self):
         print("Record positions, enter to log position, q to quit.")
         while True:    # infinite loop
@@ -195,6 +222,6 @@ class UR(RobotBase):
                 self.rtde_c.stopScript()
                 break
             # Joint angles
-            print(self.rtde_r.getActualQ())
+            print([ '%.5f' % elem for elem in self.rtde_r.getActualQ() ])
 
             time.sleep(0.2)

@@ -6,9 +6,9 @@ import numpy as np
 from PIL import Image, ImageDraw
 from threading import Thread
 
-def fetchClass(cameraType):
+def fetchClass(cameraType, config):
     if cameraType.lower() == 'logi':
-        return Logi()
+        return Logi(config)
 
 class Camera(object):
     """
@@ -47,12 +47,13 @@ class Camera(object):
         Stops the livestream
     """
 
-    def __init__(self):
+    def __init__(self, config=None):
         self.connected = False
         self.camera = None
         self.streaming = False
         self.recording = False
-        self.path = None
+        self.config = config
+        self.path = self.config['camera']['save_path']
 
     def connect(self, id="0"):
         raise NotImplementedError("camera.connect has not been implemented")
@@ -63,14 +64,14 @@ class Camera(object):
     def recordvideo(self):
         raise NotImplementedError("camera.recordvideo has not been implemented")
 
-    def savemedia(self, media, file_path,type="image"):
-        if not os.path.exists(file_path):
-            os.makedirs(file_path)
+    def savemedia(self, media, type="image"):
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
         if type == "image":
             # Count number of jpg images to name files correctly.
-            numFiles = len(glob.glob1(file_path,"*.jpg"))
+            numFiles = len(glob.glob1(self.path,"*.jpg"))
             file_name = str(numFiles).zfill(8)
-            cv2.imwrite(file_path + file_name + ".jpg", media)
+            cv2.imwrite(self.path + file_name + ".jpg", media)
             print("==> Image saved: %s" % file_name + ".jpg")
             return file_name
 
@@ -88,7 +89,7 @@ class Camera(object):
         print("==> Displaying live feed")
 
         # Return thread to update livestream
-        return Thread(target=self.fetchframe, args=(), daemon=True)
+        Thread(target=self.fetchframe, args=(), daemon=True).start()
 
     def projectPoint(self, point, camera, image, output):
         matrix = np.loadtxt(camera)
@@ -128,32 +129,43 @@ class Camera(object):
         print("==> Camera disconnected")
         self.connected = False
 
+
 class Canon(Camera):
     pass
 
 
 # Camera function for traditional webcams
 class Logi(Camera):
-    def connect(self,path="./captures/", camera_id=0):
-        try:
-            self.camera = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
-            self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
-            self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        except:
-            print("==> Error: Cannot open webcam (ID: " + str(camera_id) + "), Please specify integer value")
-            return False
-        # Check camera connected
-        if not self.camera.isOpened():
-            print("==> Error: Cannot open webcam (ID: " + str(camera_id) + ")")
-            return False
+    def connect(self,camera_id=0):
+        if(self.connected):
+            return True
         else:
-            self.path = path
-            self.msg_connected()
+            try:
+                self.camera = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
+                self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 3840.0)
+                self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160.0)
+            except:
+                print("==> Error: Cannot open webcam (ID: " + str(camera_id) + "), Please specify integer value")
+                return False
+            # Check camera connected
+            if not self.camera.isOpened():
+                print("==> Error: Cannot open webcam (ID: " + str(camera_id) + ")")
+                return False
+            else:
+                self.msg_connected()
 
     def fetchframe(self):
         (_, frame) = self.camera.read()
         # Open live stream
         while self.streaming:
+            scale_percent = 30 # percent of original size
+            width = int(frame.shape[1] * scale_percent / 100)
+            height = int(frame.shape[0] * scale_percent / 100)
+            dim = (width, height)
+
+            # resize image
+            frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+
             cv2.imshow('Input', frame)
             (_, frame) = self.camera.read()
             cv2.waitKey(1)
@@ -175,7 +187,7 @@ class Logi(Camera):
     def capture(self):
         (grabbed, frame) = self.camera.read()
         if grabbed:
-            return self.savemedia(frame, self.path)
+            return self.savemedia(frame)
 
     def disconnect(self):
         self.camera.release()

@@ -5,23 +5,22 @@ Created by Jonathon Gibbs, please reference if used.
 www.jonathongibbs.co.uk
 https://github.com/pszjg
 """
-
+from calibration import calibration_functions as functions
+import configparser
 import numpy as np
 import os
 import glob
 import re
 
 class AXYB(object):
-    def __init__(self, directory):
+    def __init__(self, config):
         np.set_printoptions(suppress=True)
-        self.directory = directory
+        # Check if path exists
+        if not os.path.exists(config['calibration']['working_dir'] + '\\axyb\\'):
+            print("==> Error, calibration path '" + config['calibration']['working_dir'] + "\\axyb\\' does not exist")
+            return False
 
-        if not os.path.exists(self.directory + "/calibration/") or not os.path.exists(self.directory + "/cameras/"):
-            print("==> Error calibrating for AX=YB, invalid file structure. Use 'help axyb'")
-            return None
-
-        self.txt_path = self.directory + "/calibration/"
-        self.cam_path = self.directory + "/cameras/"
+        self.txt_path = config['calibration']['working_dir'] + '\\axyb\\'
         self.files = 0
         # Declare empty variables
         (self.A, self.B, self.X, self.Y) = [],[],[],[]
@@ -108,3 +107,16 @@ class AXYB(object):
 
         np.savetxt(self.txt_path + "X2.txt", xRT, fmt='%.8f')
         np.savetxt(self.txt_path + "Y2.txt", yRT, fmt='%.8f')
+
+        print("==> Calibration saved to " + self.txt_path)
+        print("==> AXYB has successfully been calculated")
+
+def run():
+    config = configparser.ConfigParser()
+    config.read("./config.ini")
+    # Initialise
+    axyb = AXYB(config)
+    # Load files
+    axyb.load()
+    # Calculate dornaika
+    axyb.dornaika()
