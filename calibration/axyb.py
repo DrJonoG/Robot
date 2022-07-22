@@ -5,7 +5,7 @@ Created by Jonathon Gibbs, please reference if used.
 www.jonathongibbs.co.uk
 https://github.com/pszjg
 """
-from calibration import calibration_functions as functions
+from calibration import functions as functions
 import configparser
 import numpy as np
 import os

@@ -8,23 +8,35 @@ https://github.com/pszjg
 
 from hardware import robot as R
 from hardware import camera as C
-from hardware import turntable as T
-
+#from hardware import turntable as T
+from io_func import read_write as IO
 import configparser
 
-class CameraCalibration():
-    def __init__(self, cam, robot, turntable):
+class Calibrate():
+    def __init__(self):
         # Load X and Y
         self.X = None
         self.Y = None
 
+        self.cam = None
+        self.robot = None
+        self.turntable = None
+        self.config = None
+
+
+    def initialise(self, cam, robot, turntable, config):
         # Robot, camera and turntable
         self.cam = cam
         self.robot = robot
         self.turntable = turntable
+        self.config = config
 
     # Temporary manual positions
-    def start(self):
+    def calibrate(self):
+        # Reset to home positon
+        self.robot.home()
+
+        # Temporary manual positions
         robotPositions = [
             [-1.5910828749286097, -3.4696413479247035, 1.1608193556415003, -1.7051917515196742, -4.600187842045919, 0.8421457409858704],
             [-1.9187200705157679, -3.5524121723570765, 0.9695852438556116, -1.4929271799376984, -4.157844845448629, 0.21954363584518433],
@@ -40,22 +52,34 @@ class CameraCalibration():
             [-0.774571720753805, -3.2981025181212367, 1.0364635626422327, -2.0157276592650355, -5.3614113370524805, 1.6982053518295288]
         ]
 
-        for position in robotPositions:
+        # Go to each position and capture images
+        for i in range(0, len(robotPositions)):
             # Move robot to position
             self.robot.move(robotPositions[i])
             # Capture image
             currentFile = self.cam.capture()
             # Calculate robot transformation matrix
             robotMatrix = self.robot.angles_to_transformation()
-            # Calculate A
+            # Write matrix
+            IO.wMatrix(robotMatrix, currentFile, self.config['calibration']['working_dir'] + '/axyb/', 'B')
 
+        # Initialise calibration and parameters
+        camCalib = CamCalib.calibrateCamera(self.config['calibration']['working_dir'] + '/images/', self.config['calibration']['out_path'], self.config['calibration']['cb_width'], self.config['calibration']['cb_length'], self.config['calibration']['cb_size'])
 
-            print(position)
+        # Perform calibration
+        camCalib.calibrate()
 
-if __name__ == "__main__":
-    self.config = configparser.ConfigParser()
-    self.config.read("./config.ini")
+        # Project point to 0 for verification
+        #for filepath in glob.iglob(self.config['calibration']['working_dir'] + '\images\*.jpg'):
+        #    imagePath = filepath
+        #    outputPath = filepath.replace("images","projected")
+        #    txtPath = filepath.replace("images","projection").replace(".jpg",".txt")
+        #    # Project point
+        #    self.cam.projectPoint(np.array([0,0,0,1]), txtPath, imagePath, outputPath)
 
-    # Start application
-    A = CameraCalibration()
-    A.start()
+        # Initialise AXYB calibration
+        axyb = AXYB(self.config)
+        # Load files
+        axyb.load()
+        # Calculate dornaika
+        axyb.dornaika()
