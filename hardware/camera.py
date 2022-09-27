@@ -72,7 +72,7 @@ class Camera(object):
             numFiles = len(glob.glob1(self.path,"*.jpg"))
             file_name = str(numFiles).zfill(8)
             cv2.imwrite(self.path + file_name + ".jpg", media)
-            print("==> Image saved: %s" % file_name + ".jpg")
+            print(f"==> Image saved: {self.path + file_name}.jpg")
             return file_name
 
     def livestream(self):
@@ -185,9 +185,24 @@ class Logi(Camera):
 
     # Returns the name of the file it saved
     def capture(self):
-        (grabbed, frame) = self.camera.read()
-        if grabbed:
-            return self.savemedia(frame)
+        attempts = 0
+        while True:
+            if attempts >= 10:
+                return False
+            # Check for blur here
+            blur = False
+            (grabbed, frame) = self.camera.read()
+            # Check frame for blur
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if cv2.Laplacian(gray, cv2.CV_64F).var() < 5:
+                blur = True
+                attempts = attempts + 1
+                print(f"==> Image blurred. Attempting recapture {attempts} of 10.")
+                time.sleep(1)
+            # Exit when non blur is found
+            if grabbed and blur == False:
+                attempts = 0
+                return self.savemedia(frame)
 
     def disconnect(self):
         self.camera.release()

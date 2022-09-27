@@ -1,5 +1,11 @@
 import time
 from win32com.client import Dispatch
+import pythoncom
+
+def fetchClass(turntableType):
+    if turntableType.lower() == 'hrt':
+        return HRT()
+
 
 class Turntable(object):
     def __init__(self):
@@ -23,9 +29,16 @@ class Turntable(object):
 class HRT(Turntable):
     def __init__(self):
         self.turntable = None
+        self.connected = False
 
     def connect(self):
-        ## Dispatching TurnTableControl
+        # Check if we are already connected to the turntable
+        if self.connected:
+            return
+
+        # Needed as turntable is running within thread
+        pythoncom.CoInitialize()
+            ## Dispatching TurnTableControl
         ttc = Dispatch("TurnTableControlLib.TurnTableControl")
 
         ## Check if there is a cable / TurnTable connected
@@ -39,10 +52,14 @@ class HRT(Turntable):
         elif self.turntable.ConnectionState == 1:
             raise Exception('==> Error: The Turntable is switched off or not connected to CUD III')
         elif self.turntable.ConnectionState == 2:
-            print('==> Error: The Turntable has been found!')
+            self.connected = True
+            print('==> Successfully connected to turntable')
 
         # initialise velocity
-        self.turntable.Velocity = 1.5
+        self.turntable.Velocity = 0.2
+        self.turntable.Torque = 20
+        # Reset
+        self.Home()
 
     def waitWhileDriving(self):
         time.sleep(1)
@@ -54,14 +71,19 @@ class HRT(Turntable):
                 print('==> Error: Timeout while wait for turntable to stop')
                 break
 
-    def GoToPos(self, x):
+    def Home(self):
+        self.turntable.GotoPosition(0)
+        self.waitWhileDriving()
+        time.sleep(0.5)
+
+    def GoTo(self, x):
         self.turntable.GotoPosition(x)
-        self.waitWhileDriving(self.turntable)
+        self.waitWhileDriving()
         time.sleep(0.5)
 
     def GotoCW(self, x):
         self.turntable.GotoCW(x)
-        waitWhileDriving(self.turntable)
+        self.waitWhileDriving()
         time.sleep(0.5)
 
     def GotoCCW(self, x):

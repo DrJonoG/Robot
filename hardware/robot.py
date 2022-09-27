@@ -140,15 +140,14 @@ class UR(RobotBase):
         else:
             try:
                 self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                self.s.connect((self.config['host'], int(self.config['port'])))
+                self.s.connect((self.config['robot']['host'], int(self.config['robot']['port'])))
                 # RTDE connect
-                self.rtde_c = RTDEControl(self.config['host'])
-                self.rtde_r = RTDEReceive(self.config['host'])
+                self.rtde_c = RTDEControl(self.config['robot']['host'])
+                self.rtde_r = RTDEReceive(self.config['robot']['host'])
                 # Wait 0.05 seconds because the robot communication speed is 125 Hz = 0.008 seconds
                 time.sleep(0.05)
                 # Connected
                 self.msg_connected()
-                self.path = self.config['save_path']
             except socket.error as msg:
                 self.connected = False
                 print("Caught exception socket.error : %s" % msg)
@@ -167,7 +166,7 @@ class UR(RobotBase):
             while not self.rtde_c.isSteady():
                 time.sleep(0.2)
         # pause before continuation
-        time.sleep(1)
+        time.sleep(2)
 
     def send(self, command):
         if not self.connected:
@@ -212,6 +211,7 @@ class UR(RobotBase):
 
     def manual_positions(self):
         print("Record positions, enter to log position, q to quit.")
+        positionCount = 0
         while True:    # infinite loop
             # Turn on manual drive
             self.rtde_c.teachMode()
@@ -222,6 +222,10 @@ class UR(RobotBase):
                 self.rtde_c.stopScript()
                 break
             # Joint angles
-            print([ '%.5f' % elem for elem in self.rtde_r.getActualQ() ])
+            with open(self.config['calibration']['working_dir'] + "/positionLog.txt", "a+") as f:
+                positionCount += 1
+                stringOut = [ '%.5f' % elem for elem in self.rtde_r.getActualQ() ]
+                f.write(str(stringOut).replace("'","")[1:-1] + "\n")
+                print("==> Position (# " + str(positionCount) + ") " + str(stringOut).replace("'","")  + " saved.")
 
             time.sleep(0.2)
