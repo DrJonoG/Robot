@@ -37,6 +37,8 @@ class ImageAcquisition():
 
             self.X = np.loadtxt(self.calibrationPath + "X.txt")
             self.Y = np.loadtxt(self.calibrationPath + "Y.txt")
+            self.rError = np.loadtxt(self.calibrationPath + '\\rError.txt')
+            self.tError = np.loadtxt(self.calibrationPath + '\\tError.txt')
             self.intrinsic = np.asmatrix(np.loadtxt(self.calibrationPath + "intrinsic.txt"))
             self.ttCenter = np.loadtxt(self.calibrationPath + "center.txt")
             self.ttCenter[2] = 0
@@ -69,7 +71,7 @@ class ImageAcquisition():
     def calculatePositions(self):
         # TODO
         np.set_printoptions(formatter={'float': lambda x: "%.5f" % (x,)})
-        tempPath = self.config['calibration']['working_dir'] + "\positionLog.txt"
+        tempPath = self.config['calibration']['working_dir'] + "\positionLog_cap.txt"
         robotPositions = np.loadtxt(tempPath, delimiter=',')
         return robotPositions
 
@@ -89,95 +91,105 @@ class ImageAcquisition():
         # TODO: this is a temporary solution of 30 degree rotations:
         rotations = int(360 / self.degreesPerRot)
 
-        rError = None
-        tError = None
-
-        # Load rotation and translation errors:
-        if os.path.exists(self.calibrationPath + '\\rError.txt') and os.path.exists(self.calibrationPath + '\\tError.txt'):
-            rError = np.loadtxt(self.calibrationPath + '\\rError.txt')
-            tError = np.loadtxt(self.calibrationPath + '\\tError.txt')
-
+        # Collect data
         for i in range(0, rotations):
             Y = np.loadtxt(self.calibrationPath + "Y.txt")
             # Account for rotation
             degrees = self.degreesPerRot * i
             # Move turntable
             self.turntable.GoTo(degrees)
-            # Load Y
-            Y = np.loadtxt(self.calibrationPath + "Y.txt")
-            # Adjust for robot positions
-            degrees = degrees * -1
-            print("==> Calculating rotation of robot (" + str(degrees) + ")")
-            # Convert to rads
-            radians = (degrees * 0.0174532925)
-            # get rotation of Y estimate
-            estY = np.dot(Y, functions.rotZ(radians))
-            # Difference in translation
-            cPoint = self.ttCenter * -1
-            cPoint = np.append(cPoint, [1])
-            point = np.dot(functions.rotZ(radians), cPoint)
-            # calculate translation back to origin
-            point[0:3] = point[0:3] + self.ttCenter
 
-            # translate to origin
-            tempVec =  np.dot(functions.matrix_inverse(Y), point)
-            # Create Y
-            estY[0:3,3] = tempVec[0:3]
+            ###############################
+            ####### Y Calculations ########
+            ###############################
+            # If rotation is not zero then adjust
+            if degrees == 0:
+                print("Zero degrees")
+            else:
+                # Adjust for robot positions
+                degrees = degrees * -1
+                print("==> Calculating rotation of robot (" + str(degrees) + ")")
+                # Convert to rads
+                radians = (degrees * 0.0174532925)
+                # get rotation of Y estimate
+                estY = np.dot(Y, functions.rotZ(radians))
+                # Difference in translation
+                cPoint = self.ttCenter * -1
+                cPoint = np.append(cPoint, [1])
+                point = np.dot(functions.rotZ(radians), cPoint)
+                # calculate translation back to origin
+                point[0:3] = point[0:3] + self.ttCenter
 
-            # Invert back to final Y
-            Y =  functions.matrix_inverse(estY)
+                # translate to origin
+                tempVec =  np.dot(functions.matrix_inverse(Y), point)
+                # Create Y
+                estY[0:3,3] = tempVec[0:3]
+
+                # Invert back to final Y
+                Y = functions.matrix_inverse(estY)
+            ###############################
+            ##### End Y Calculations ######
+            ###############################
 
             # Iterate positions
             for position in robotPositions:
-                AProjection = None
                 A = None
                 # Move robot to position
                 self.robot.move(position)
                 # Capture image
                 currentFile = self.cam.capture()
+
                 # Check that image was found
                 if currentFile == False:
                     continue
-
-                # Calculate robot transformation matrix
+                # Calculate robot transformation matrix and save
                 B = self.robot.angles_to_transformation()
                 np.savetxt(self.testFolder + "B" + currentFile + '.txt', B, fmt='%1.5f')
 
-                # Calculate and save A if testing, else not needed
+                # Calculate and save A
                 A = np.dot(self.X, functions.matrix_inverse(np.dot(Y, B)))
-
-                # Adjust for error if exists
-                if rError is not None and tError is not None and self.config['general']['err_adjustment'] == 'True':
-                    A[0:3,3] = A[0:3,3] + tError
-                    A[0:3,0:3] = A[0:3,0:3] + rError
+                np.savetxt(self.aFolder + currentFile + '.txt', A, fmt='%1.5f')
 
                 # Estimate projection matrix and save
-                AProjection = np.dot(self.intrinsic, A[0:3,:])
-                np.savetxt(self.txtFolder + currentFile + '.txt', AProjection, fmt='%1.5f')
-                if self.config['general']['testing'] == "True":
-                    np.savetxt(self.aFolder + currentFile + '.txt', A, fmt='%1.5f')
+                matrix = np.dot(self.intrinsic, A[0:3,:])
+                np.savetxt(self.txtFolder + currentFile + '.txt', matrix, fmt='%1.5f')
 
-                    projectPoint = np.array([0,0,0,1])
-                    matrix = np.loadtxt(self.txtFolder + currentFile + '.txt')
+                # Output projection (for testing purposes only)
+                projectPoint =np.array([0,0,0,1])
+
+                # Project point to camera
+                v = (matrix @ projectPoint) # dot product
+
+                x = int(v[0,0] / v[0,2])
+                y = int(v[0,1] / v[0,2])
+
+                # Import an image from directory:
+                input_image = Image.open(self.imageFolder + currentFile + '.jpg')
+                # Draw ellipse
+                draw = ImageDraw.Draw(input_image)
+                draw.ellipse((x-5, y-5, x+5, y+5), fill=(255,0,0,0))
+
+                # Adjust for error if exists
+                if self.rError is not None and self.tError is not None:
+                    A[0:3,3] = A[0:3,3] + self.tError
+                    A[0:3,0:3] = A[0:3,0:3] + self.rError
+
+                    # Estimate projection matrix and save
+                    matrix = np.dot(self.intrinsic, A[0:3,:])
+
+                    # Output projection (for testing purposes only)
+                    projectPoint =np.array([0,0,0,1])
 
                     # Project point to camera
                     v = (matrix @ projectPoint) # dot product
-                    x = int(v[0] / v[2])
-                    y = int(v[1] / v[2])
-
-                    # Import an image from directory:
-                    input_image = Image.open(self.imageFolder + currentFile + '.jpg')
+                    x = int(v[0,0] / v[0,2])
+                    y = int(v[0,1] / v[0,2])
 
                     # Draw ellipse
-                    draw = ImageDraw.Draw(input_image)
-                    draw.ellipse((x-5, y-5, x+5, y+5), fill=(255,0,0,0))
+                    draw.ellipse((x-5, y-5, x+5, y+5), fill=(0,0,255,0))
 
-
-                    input_image.save(self.testFolder + currentFile + '.jpg')
-
-
-
-
+                input_image.save(self.testFolder + currentFile + '.jpg')
+                input_image.close()
 
         self.cam.path = original
 

@@ -71,6 +71,8 @@ class Camera(object):
             # Count number of jpg images to name files correctly.
             numFiles = len(glob.glob1(self.path,"*.jpg"))
             file_name = str(numFiles).zfill(8)
+            # Rotate view
+            #media = cv2.rotate(media, cv2.ROTATE_90_CLOCKWISE)
             cv2.imwrite(self.path + file_name + ".jpg", media)
             print(f"==> Image saved: {self.path + file_name}.jpg")
             return file_name
@@ -129,6 +131,11 @@ class Camera(object):
         print("==> Camera disconnected")
         self.connected = False
 
+    def rescale(self, frame, scale):
+        width = int(frame.shape[1] * scale)
+        height = int(frame.shape[0] * scale)
+        return cv2.resize(frame, (width, height), interpolation=cv2.INTER_AREA)
+
 
 class Canon(Camera):
     pass
@@ -158,13 +165,14 @@ class Logi(Camera):
         (_, frame) = self.camera.read()
         # Open live stream
         while self.streaming:
-            scale_percent = 30 # percent of original size
+            scale_percent = 20 # percent of original size
             width = int(frame.shape[1] * scale_percent / 100)
             height = int(frame.shape[0] * scale_percent / 100)
             dim = (width, height)
-
             # resize image
             frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+            # Rotate view
+            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
             cv2.imshow('Input', frame)
             (_, frame) = self.camera.read()
@@ -203,6 +211,7 @@ class Logi(Camera):
             if grabbed and blur == False:
                 attempts = 0
                 return self.savemedia(frame)
+
 
     def disconnect(self):
         self.camera.release()

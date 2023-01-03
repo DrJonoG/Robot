@@ -31,7 +31,7 @@ def filterPoints(path, output, config):
     # Filter xyz
     df = df[(df[2] > zMin) & (df[2] < zMax) & (df[1] > yMin) & (df[1] < yMax) & (df[0] < xMax) & (df[0] > xMin)]
     # Filter colour
-    df = df[(df[6] > rMin) & (df[7] > gMin) & (df[8] > bMin) & (df[6] < rMax) & (df[7] < gMax) & (df[8] < bMax)]
+    #df = df[(df[6] > rMin) & (df[7] > gMin) & (df[8] > bMin) & (df[6] < rMax) & (df[7] < gMax) & (df[8] < bMax)]
 
     # Revert back
     df = df.to_numpy()

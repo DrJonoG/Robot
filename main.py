@@ -14,6 +14,7 @@ import glob
 import configparser
 import numpy as np
 import shutil
+import pathlib
 
 class main(object):
     def __init__(self, path, config):
@@ -28,7 +29,7 @@ class main(object):
 
         self.cam = C.fetchClass(self.config['hardware']['camera'], self.config)
         self.robot = R.fetchClass(self.config['hardware']['robot'], self.config)
-        self.turntable = T.fetchClass(self.config['hardware']['turntable'])
+        self.turntable = T.fetchClass(self.config['hardware']['turntable'], self.config)
         self.camCalibration = CamCalibration.calibrateCamera(self.config['calibration']['working_dir'], self.config)
         self.ttCalibration = TTCalibration.calibrateTurntable(self.config)
         self.modelling = Model.ImageAcquisition()
@@ -61,14 +62,20 @@ class main(object):
             'robot.home':[[self.robot.connect],[self.robot.home]],
             'robot.open': [[self.robot.connect],[self.robot.open]],
             'robot.close': [[self.robot.connect],[self.robot.close]],
+            'calib': [
+                [self.camCalibration.calibrate],
+                [AXYB.run],
+                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
+            ],
             'calib.turntable': [
-                [self.cam.connect],
-                [self.cam.livestream],
-                [self.robot.connect],
-                [self.turntable.connect],
-                [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
-                [self.ttCalibration.calibrate],
-                [self.ttCalibration.estimateCenter]
+                #[self.cam.connect],
+                #[self.cam.livestream],
+                #[self.robot.connect],
+                #[self.turntable.connect],
+                #[self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
+                #[self.ttCalibration.calibrate],
+                [self.ttCalibration.estimateCenter],
+                [self.camCalibration.averageIntrinsics],
             ],
             'calib.cam': [
                 [self.cam.connect],
@@ -85,7 +92,8 @@ class main(object):
                 [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
                 [self.camCalibration.capture, self.robot, self.cam, self.turntable],
                 [self.camCalibration.calibrate],
-                [AXYB.run]
+                [AXYB.run],
+                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
             ],
             'calib.full': [
                 [self.cam.connect],
@@ -97,7 +105,7 @@ class main(object):
                 [self.ttCalibration.estimateCenter],
                 [self.camCalibration.capture, self.robot, self.cam, self.turntable],
                 [self.camCalibration.calibrate],
-                #[self.camCalibration.averageIntrinsics],
+                [self.camCalibration.averageIntrinsics],
                 [AXYB.run],
             ],
             'record.position': [
@@ -108,7 +116,8 @@ class main(object):
             ],
             'model.recon': [
                 [self.PMVS.createFiles],
-                [self.PMVS.run]
+                [self.PMVS.run],
+                [Filter.filterPoints,  self.config['model']['working_dir'] + r'\models\option.txt.ply', self.config['model']['working_dir'] + r'\models\filtered.ply', self.config]
             ],
             'model.capture': [
                 [self.cam.connect],
@@ -126,10 +135,20 @@ class main(object):
                 [self.modelling.initialise, self.robot, self.cam, self.turntable, self.config],
                 [self.modelling.run],
                 [self.PMVS.createFiles],
-                [self.PMVS.run]
+                [self.PMVS.run],
+                [Filter.filterPoints,  self.config['model']['working_dir'] + r'\models\option.txt.ply', self.config['model']['working_dir'] + r'\models\filtered.ply', self.config]
+            ],
+            'undist': [
+                [IO.undistort, self.config['model']['working_dir'] + "\\images\\", self.config['model']['working_dir'] + "\\visualize\\", self.config]
             ],
             'test': [
-                [Filter.filterPoints, r'I:\Data\SlowRotation\models\option.txt.ply',r'I:\Data\SlowRotation\models\test.txt.ply', self.config]
+                [Filter.filterPoints,  r'I:\calibration7\testmodel\models\option.txt.ply',r'I:\calibration7\testmodel\models\filtered.txt.ply', self.config]
+            ],
+            'est': [
+                [self.ttCalibration.estimateCenter]
+            ],
+            'a': [
+                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
             ]
         }
         iter = True

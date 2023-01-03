@@ -165,8 +165,6 @@ class UR(RobotBase):
         if wait:
             while not self.rtde_c.isSteady():
                 time.sleep(0.2)
-        # pause before continuation
-        time.sleep(2)
 
     def send(self, command):
         if not self.connected:

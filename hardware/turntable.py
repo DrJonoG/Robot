@@ -2,9 +2,9 @@ import time
 from win32com.client import Dispatch
 import pythoncom
 
-def fetchClass(turntableType):
+def fetchClass(turntableType, config):
     if turntableType.lower() == 'hrt':
-        return HRT()
+        return HRT(config)
 
 
 class Turntable(object):
@@ -27,9 +27,10 @@ class Turntable(object):
         pass
 
 class HRT(Turntable):
-    def __init__(self):
+    def __init__(self, config):
         self.turntable = None
         self.connected = False
+        self.config = config
 
     def connect(self):
         # Check if we are already connected to the turntable
@@ -56,8 +57,8 @@ class HRT(Turntable):
             print('==> Successfully connected to turntable')
 
         # initialise velocity
-        self.turntable.Velocity = 0.2
-        self.turntable.Torque = 20
+        self.turntable.Velocity = float(self.config['turntable']['velocity'])
+        self.turntable.Torque = int(self.config['turntable']['torque'])
         # Reset
         self.Home()
 

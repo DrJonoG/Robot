@@ -52,4 +52,4 @@ def turntableCalibration(robot, cam, maxpositions, positionPath):
     tempPath = positionPath + "\positionLog.txt"
     robotPositions = np.loadtxt(tempPath, delimiter=',')
     # Limit the return
-    return robotPositions[0:maxpositions]
+    return robotPositions#[0:maxpositions]

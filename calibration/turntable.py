@@ -38,7 +38,7 @@ class calibrateTurntable(object):
         # Store original camera path
         originalPath = self.cam.path
         # Get robot positions
-        robotPositions = activePositions.turntableCalibration(self.robot, self.cam, 25, self.config['calibration']['working_dir'])
+        robotPositions = activePositions.turntableCalibration(self.robot, self.cam, int(self.config['calibration']['center_images']), self.config['calibration']['working_dir'])
         degreesPerRot = round(360 / self.rotations, 2)
         for i in range(0, self.rotations):
             # Update camera path
@@ -46,20 +46,48 @@ class calibrateTurntable(object):
             camCalibration = CamCalibration.calibrateCamera(self.path + str(i) + '\\', self.config)
             # for each rotation perform calibration
             print(degreesPerRot * i)
+            self.turntable.GoTo(degreesPerRot * i)
             for position in robotPositions:
-                self.turntable.GoTo(degreesPerRot * i)
                 # Move robot to position
                 self.robot.move(position)
                 # Capture image
                 _ = self.cam.capture()
             # Perform calibration on the collected images
             camCalibration.calibrate()
+            # Reset robot to home to avoid any collisions
+            self.robot.home()
         # Estimate the center of the turntable using the collection of calibrations
         self.estimateCenter()
         # Reset to home position
         self.turntable.Home()
+        self.robot.home()
+
+    # Folder is the name of the folder where the data will be stored.
+    def calibrateAtAngle(self, degrees, folder):
+        # Reset robot position
+        self.robot.home()
+        # Move to specified degrees
+        self.turntable.GoTo(degrees)
+        # Store original camera path
+        originalPath = self.cam.path
+        # Get robot positions
+        robotPositions = activePositions.turntableCalibration(self.robot, self.cam, int(self.config['calibration']['center_images']), self.config['calibration']['working_dir'])
+        # Update camera path
+        self.cam.path = self.path + '\\' + str(folder) + '\\images\\'
+        camCalibration = CamCalibration.calibrateCamera(self.path + str(folder) + '\\', self.config)
+        # for each rotation perform calibration
+        for position in robotPositions:
+            # Move robot to position
+            self.robot.move(position)
+            # Capture image
+            _ = self.cam.capture()
+        # Perform calibration on the collected images
+        camCalibration.calibrate()
+        # Reset robot to home to avoid any collisions
+        self.robot.home()
 
     def estimateCenter(self):
+
         # Check if enough
         if self.rotations < 4:
             print("==> Error: more rotations are required for turntable calibration.")
@@ -87,17 +115,21 @@ class calibrateTurntable(object):
                 startDir = self.path + "\\" + str(i) + "\\axyb\\"
                 endDir = self.path + "\\" + str(i + numLines) + "\\axyb\\"
 
-                # Skip intrinsic matrix
-
-
                 # Check same file exists in end dir
                 if not os.path.exists(endDir + filename):
                     print("==> Error calibrating tunrtable. End rotation not found")
                     exit()
 
+                startMatrix = np.asmatrix(np.loadtxt(startDir + filename))
+                endMatrix = np.asmatrix(np.loadtxt(endDir + filename))
+
+                startInverse = functions.matrix_inverse(startMatrix)
+                endInverse = functions.matrix_inverse(endMatrix)
+
                 # Load files and obtain translation of each file
-                PA[i] = np.transpose(functions.matrix_inverse(np.asmatrix(np.loadtxt(startDir + filename)))[0:3,3])
-                PB[i] = np.transpose(functions.matrix_inverse(np.asmatrix(np.loadtxt(endDir + filename)))[0:3,3])
+                PA[i] = np.transpose(startInverse[0:3,3])
+                PB[i] = np.transpose(endInverse[0:3,3])
+
 
             # Update count
             imageCount += 1
