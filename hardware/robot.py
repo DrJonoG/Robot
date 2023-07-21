@@ -1,9 +1,15 @@
 from rtde_control import RTDEControlInterface as RTDEControl
 from rtde_receive import RTDEReceiveInterface as RTDEReceive
 import numpy as np
+import os
 import math
 import socket
 import time
+from colorama import init as colorama_init
+from colorama import Fore
+from colorama import Style
+
+colorama_init()
 
 def fetchClass(robotType, config):
     if robotType.lower() == 'ur5' or robotType.lower() == 'ur10' or robotType.lower() == 'ur':
@@ -160,11 +166,11 @@ class UR(RobotBase):
         self.move([0,-1.57,0,-1.57,0,0])
 
     def move(self, position, wait=True):
-        self.rtde_c.moveJ(position, 0.8, 0.8)
+        self.rtde_c.moveJ(position, float(self.config['robot']['speed']), float(self.config['robot']['accel']))
         # wait for move to finish
         if wait:
             while not self.rtde_c.isSteady():
-                time.sleep(0.2)
+                time.sleep(0.3)
 
     def send(self, command):
         if not self.connected:
@@ -207,8 +213,33 @@ class UR(RobotBase):
         	l = f.read(1024)
         time.sleep(0.2)
 
+    # Calculate the distance to singularity based on current position
+    def singularity(self):
+         # WRIST
+         actual_q = self.rtde_r.getActualQ()
+         q_5 = actual_q[4]
+         # calculate distance to wrist singularity.
+         d_w = math.sin(q_5) ** 2
+         # HEAD
+         current_pose = self.rtde_r.getActualTCPPose()
+         x = current_pose[0]
+         y = current_pose[1]
+         # calculate distance to head singularity.
+         d_h = math.sqrt(math.pow(x, 2) + math.pow(y, 2))
+         # ELBOW
+         # Simply how close q3 is to zero.
+         d_e = actual_q[2]
+
+         return [d_w, d_h, d_e]
+
+    # Used to log positions that the user manually moves the robot too, ideal for setting up calibration
     def manual_positions(self):
-        print("Record positions, enter to log position, q to quit.")
+        os.makedirs(self.config['model']['working_dir'], exist_ok=True)
+        # define error colors
+        CRED = '\033[91m'
+        CEND = '\033[0m'
+
+        print("==> Record positions, enter to log position, q to quit.")
         positionCount = 0
         while True:    # infinite loop
             # Turn on manual drive
@@ -220,10 +251,15 @@ class UR(RobotBase):
                 self.rtde_c.stopScript()
                 break
             # Joint angles
-            with open(self.config['calibration']['working_dir'] + "/positionLog.txt", "a+") as f:
-                positionCount += 1
+            with open(self.config['calibration']['positions'], "a+") as f:
                 stringOut = [ '%.5f' % elem for elem in self.rtde_r.getActualQ() ]
-                f.write(str(stringOut).replace("'","")[1:-1] + "\n")
                 print("==> Position (# " + str(positionCount) + ") " + str(stringOut).replace("'","")  + " saved.")
 
+                s = self.singularity()
+                if s[0] < 0.1 or s[1] < 0.1 or (s[2] < 0.09 and s[2] > -0.09):
+                    print('==>' + CRED + ' Singularity: {:f}'.format(s[0]) + " " + '{:f}'.format(s[1]) + " " + '{:f}'.format(s[2]) + CEND)
+                else:
+                    positionCount += 1
+                    f.write(str(stringOut).replace("'","")[1:-1] + "\n")
+                    print('==> Singularity: {:f}'.format(s[0]) + " " + '{:f}'.format(s[1]) + " " + '{:f}'.format(s[2]))
             time.sleep(0.2)

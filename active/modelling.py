@@ -58,8 +58,11 @@ class ImageAcquisition():
 
             # If testing
             if self.config['general']['testing'] == "True":
+                # Y output
+                self.yFolder = self.config['model']['working_dir'] + '\\Y\\'
+                if not os.path.exists(self.yFolder):   os.makedirs(self.yFolder)
                 # Image output
-                self.testFolder = self.config['model']['working_dir'] + '\\testing\\'
+                self.testFolder = self.config['model']['working_dir'] + '\\B\\'
                 if not os.path.exists(self.testFolder):   os.makedirs(self.testFolder)
                 # Original estimate of A output
                 self.aFolder = self.config['model']['working_dir'] + '\\A\\'
@@ -71,8 +74,7 @@ class ImageAcquisition():
     def calculatePositions(self):
         # TODO
         np.set_printoptions(formatter={'float': lambda x: "%.5f" % (x,)})
-        tempPath = self.config['calibration']['working_dir'] + "\positionLog_cap.txt"
-        robotPositions = np.loadtxt(tempPath, delimiter=',')
+        robotPositions = np.loadtxt(self.config['model']['positions'], delimiter=',')
         return robotPositions
 
     # Temporary manual positions
@@ -98,7 +100,8 @@ class ImageAcquisition():
             degrees = self.degreesPerRot * i
             # Move turntable
             self.turntable.GoTo(degrees)
-
+            # Sleep for 5 seconds to allow movement to stop, if any.
+            time.sleep(10)
             ###############################
             ####### Y Calculations ########
             ###############################
@@ -127,6 +130,7 @@ class ImageAcquisition():
 
                 # Invert back to final Y
                 Y = functions.matrix_inverse(estY)
+
             ###############################
             ##### End Y Calculations ######
             ###############################
@@ -142,6 +146,10 @@ class ImageAcquisition():
                 # Check that image was found
                 if currentFile == False:
                     continue
+
+                # Save Y estimate
+                np.savetxt(self.yFolder + "Y" + currentFile + '.txt', Y, fmt='%1.5f')
+
                 # Calculate robot transformation matrix and save
                 B = self.robot.angles_to_transformation()
                 np.savetxt(self.testFolder + "B" + currentFile + '.txt', B, fmt='%1.5f')

@@ -8,9 +8,13 @@ https://github.com/pszjg
 from calibration import functions as functions
 from active import calibration as activePositions
 from calibration import camera as CamCalibration
+from calibration import axyb as AXYB
+from io_func import read_write as IO
 import os
 import math
 import numpy as np
+from datetime import datetime
+import time
 
 class calibrateTurntable(object):
     def __init__(self, config):
@@ -26,6 +30,7 @@ class calibrateTurntable(object):
         for i in range(0, self.rotations):
             if not os.path.exists(self.path + str(i)):
                 os.makedirs(self.path + str(i))
+                os.makedirs(self.path + str(i) + "\\axyb\\")
 
     def initialise(self, robot, cam, turntable):
         self.robot = robot
@@ -38,24 +43,42 @@ class calibrateTurntable(object):
         # Store original camera path
         originalPath = self.cam.path
         # Get robot positions
-        robotPositions = activePositions.turntableCalibration(self.robot, self.cam, int(self.config['calibration']['center_images']), self.config['calibration']['working_dir'])
+        robotPositions = activePositions.turntableCalibration(self.robot, self.cam, int(self.config['calibration']['center_images']), self.config['calibration']['working_dir'],self.config['calibration']['positions'])
         degreesPerRot = round(360 / self.rotations, 2)
         for i in range(0, self.rotations):
             # Update camera path
             self.cam.path = self.path + '\\' + str(i) + '\\images\\'
-            camCalibration = CamCalibration.calibrateCamera(self.path + str(i) + '\\', self.config)
+            axybPath = self.path + str(i) + "\\axyb\\"
+            camCalibration = CamCalibration.calibrateCamera(self.path + "\\" + str(i) + '\\', self.config)
             # for each rotation perform calibration
-            print(degreesPerRot * i)
-            self.turntable.GoTo(degreesPerRot * i)
+            self.turntable.GoTo((degreesPerRot * i)*-1)
+            # Variables
+            currentImage = 0
+            totalImages = len(robotPositions)
             for position in robotPositions:
+                print(datetime.now().strftime('%H:%M:%S') + f" ==> Capturing image {currentImage} of {totalImages} at {(degreesPerRot * i)} degrees.", end="\r")
                 # Move robot to position
                 self.robot.move(position)
                 # Capture image
-                _ = self.cam.capture()
+                currentFile = self.cam.capture()
+                # Get robot position from robot
+                robotMatrix = self.robot.angles_to_transformation()
+                # Write matrix
+                IO.wMatrix(robotMatrix, currentFile, axybPath, 'B')
+                # Update
+                currentImage += 1
             # Perform calibration on the collected images
             camCalibration.calibrate()
+            # Calculate AX=YB - not necessary for turntable calibration
+            #AXYB.run(self.path + '\\' + str(i) + "\\")
+            # reconnect camera
+            self.cam.disconnect()
+            time.sleep(5)
             # Reset robot to home to avoid any collisions
             self.robot.home()
+            # Reconnect
+            self.cam.connect()
+            time.sleep(5)
         # Estimate the center of the turntable using the collection of calibrations
         self.estimateCenter()
         # Reset to home position
@@ -63,7 +86,7 @@ class calibrateTurntable(object):
         self.robot.home()
 
     # Folder is the name of the folder where the data will be stored.
-    def calibrateAtAngle(self, degrees, folder):
+    def calibrateAtAngle2(self, degrees, folder):
         # Reset robot position
         self.robot.home()
         # Move to specified degrees
@@ -85,6 +108,44 @@ class calibrateTurntable(object):
         camCalibration.calibrate()
         # Reset robot to home to avoid any collisions
         self.robot.home()
+
+    def calibrateAtAngle(self, degrees, folder):
+        self.cam.connect()
+        self.robot.connect()
+        self.turntable.connect()
+        # Reset robot position
+        self.robot.home()
+        # Move to specified degrees
+        self.turntable.GoTo(degrees)
+        # Get robot positions
+        robotPositions = activePositions.turntableCalibration(self.robot, self.cam, int(self.config['calibration']['center_images']), self.config['calibration']['working_dir'],self.config['calibration']['positions'])
+        # Update camera path
+        self.cam.path = self.path + '\\' + str(folder) + '\\images\\'
+        camCalibration = CamCalibration.calibrateCamera(self.path + "\\" + str(folder) + '\\', self.config)
+        axybPath = self.path + "\\" + str(folder) + "\\axyb\\"
+        # Variables
+        currentImage = 0
+        totalImages = len(robotPositions)
+        for position in robotPositions:
+            print(datetime.now().strftime('%H:%M:%S') + f" ==> Capturing image {currentImage} of {totalImages} at {(degrees)} degrees.", end="\r")
+            # Move robot to position
+            self.robot.move(position)
+            # Capture image
+            currentFile = self.cam.capture()
+            # Get robot position from robot
+            robotMatrix = self.robot.angles_to_transformation()
+            # Write matrix
+            IO.wMatrix(robotMatrix, currentFile, axybPath, 'B')
+            # Update
+            currentImage += 1
+        # disconnect
+        self.cam.disconnect()
+        self.robot.disconnect()
+        self.turntable.disconnect()
+        # Perform calibration on the collected images
+        camCalibration.calibrate()
+        # Calculate AX=YB
+        AXYB.run(self.path + '\\' + folder + "\\")
 
     def estimateCenter(self):
 
@@ -117,6 +178,7 @@ class calibrateTurntable(object):
 
                 # Check same file exists in end dir
                 if not os.path.exists(endDir + filename):
+                    print(endDir + filename)
                     print("==> Error calibrating tunrtable. End rotation not found")
                     exit()
 

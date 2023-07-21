@@ -15,6 +15,13 @@ import configparser
 import numpy as np
 import shutil
 import pathlib
+import json
+from consolemenu import *
+from consolemenu.items import *
+from consolemenu.format import *
+from consolemenu.menu_component import Dimension
+from consolemenu.prompt_utils import PromptUtils
+import time
 
 class main(object):
     def __init__(self, path, config):
@@ -38,6 +45,12 @@ class main(object):
         print("==> Working calibration directory: " + self.config['calibration']['working_dir'])
         print("==> Working model directory: " + self.config['model']['working_dir'])
 
+    ## TODO: output help regarding menu here
+    def printConfig(self):
+        with open("./config.ini", mode="rt") as f:
+            for line in f:
+                print(line, end="")
+
     def exit_app(self):
         # Exit all applications correctly.
         if not self.cam_thread == None:
@@ -46,7 +59,6 @@ class main(object):
             self.robot.disconnect()
         if self.cam.connected == True:
             self.cam.disconnect()
-
 
     def request_input(self):
         cmd = {
@@ -57,56 +69,76 @@ class main(object):
             'cam.capture': [[self.cam.connect],[self.cam.capture]],
             'turntable.home': [[self.turntable.connect], [self.turntable.Home]],
             'turntable.connect': [[self.turntable.connect]],
-            'turntable.goto': [[self.turntable.connect], [self.turntable.GoTo]],
+            'turntable.goto': [[self.turntable.connect], [self.turntable.GoTo, 30]],
             'robot.connect':[[self.robot.connect]],
             'robot.home':[[self.robot.connect],[self.robot.home]],
             'robot.open': [[self.robot.connect],[self.robot.open]],
             'robot.close': [[self.robot.connect],[self.robot.close]],
-            'calib': [
-                [self.camCalibration.calibrate],
-                [AXYB.run],
-                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
+            'calib.axyb': [
+                #[self.camCalibration.calibrate],
+                [AXYB.estimateY, self.config],
+                #[self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
             ],
             'calib.turntable': [
-                #[self.cam.connect],
+                [self.cam.connect],
                 #[self.cam.livestream],
-                #[self.robot.connect],
-                #[self.turntable.connect],
-                #[self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
-                #[self.ttCalibration.calibrate],
+                [self.robot.connect],
+                [self.turntable.connect],
+                [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
+                [self.ttCalibration.calibrate],
                 [self.ttCalibration.estimateCenter],
                 [self.camCalibration.averageIntrinsics],
             ],
-            'calib.cam': [
+            'calib.tt': [
+                [self.cam.connect],
+                #[self.cam.livestream],
+                [self.robot.connect],
+                [self.turntable.connect],
+                [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
+                [self.ttCalibration.calibrateAtAngle, 0, '0'],
+                [self.ttCalibration.calibrateAtAngle, 45, '1'],
+                [self.ttCalibration.calibrateAtAngle, 90, '2'],
+
+            ],
+            'calib.camera': [
                 [self.cam.connect],
                 [self.cam.livestream],
                 [self.robot.connect],
                 [self.camCalibration.capture, self.robot, self.cam, self.turntable],
                 [self.camCalibration.calibrate]
             ],
+            'robot.sing': [
+                [self.robot.connect],
+                [self.robot.singularity]
+            ],
+            'home.robot': [
+                [self.robot.connect],
+                [self.robot.home],
+            ],
             'calib.robot': [
                 [self.cam.connect],
-                [self.cam.livestream],
+                #[self.cam.livestream],
                 [self.robot.connect],
                 [self.turntable.connect],
                 [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
                 [self.camCalibration.capture, self.robot, self.cam, self.turntable],
                 [self.camCalibration.calibrate],
                 [AXYB.run],
-                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
+                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"],
+                [self.exit_app],
             ],
             'calib.full': [
                 [self.cam.connect],
-                [self.cam.livestream],
+                #[self.cam.livestream],
                 [self.robot.connect],
                 [self.turntable.connect],
                 [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
                 [self.ttCalibration.calibrate],
-                [self.ttCalibration.estimateCenter],
-                [self.camCalibration.capture, self.robot, self.cam, self.turntable],
-                [self.camCalibration.calibrate],
-                [self.camCalibration.averageIntrinsics],
-                [AXYB.run],
+                [self.ttCalibration.estimateCenter]
+            ],
+            'robot.move' : [
+                [self.robot.connect],
+                [self.robot.move, np.array([4.37671, -3.72725, 1.33090, -2.14083, 2.15675, -0.67304])]
             ],
             'record.position': [
                 [self.cam.connect],
@@ -129,11 +161,12 @@ class main(object):
             ],
             'model.full': [
                 [self.cam.connect],
-                [self.cam.livestream],
+                #[self.cam.livestream],
                 [self.robot.connect],
                 [self.turntable.connect],
                 [self.modelling.initialise, self.robot, self.cam, self.turntable, self.config],
                 [self.modelling.run],
+                [self.exit_app],
                 [self.PMVS.createFiles],
                 [self.PMVS.run],
                 [Filter.filterPoints,  self.config['model']['working_dir'] + r'\models\option.txt.ply', self.config['model']['working_dir'] + r'\models\filtered.ply', self.config]
@@ -149,6 +182,9 @@ class main(object):
             ],
             'a': [
                 [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
+            ],
+            'config': [
+                [self.printConfig]
             ]
         }
         iter = True

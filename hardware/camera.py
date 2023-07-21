@@ -5,6 +5,7 @@ import glob
 import numpy as np
 from PIL import Image, ImageDraw
 from threading import Thread
+from datetime import datetime
 
 def fetchClass(cameraType, config):
     if cameraType.lower() == 'logi':
@@ -48,6 +49,7 @@ class Camera(object):
     """
 
     def __init__(self, config=None):
+        self.camera_id = 0
         self.connected = False
         self.camera = None
         self.streaming = False
@@ -73,22 +75,22 @@ class Camera(object):
             file_name = str(numFiles).zfill(8)
             # Rotate view
             #media = cv2.rotate(media, cv2.ROTATE_90_CLOCKWISE)
-            cv2.imwrite(self.path + file_name + ".jpg", media)
-            print(f"==> Image saved: {self.path + file_name}.jpg")
+            cv2.imwrite(self.path + file_name + ".jpg", media,  [cv2.IMWRITE_JPEG_QUALITY, 100])
+            #print(f"==> Image saved: {self.path + file_name}.jpg")
             return file_name
 
     def livestream(self):
         if not self.connected:
-            print("==> Error: Not connected to a camera.")
+            print(datetime.now().strftime('%H:%M:%S') + " ==> Error: Not connected to a camera.")
             return None
         elif self.streaming:
-            print("==> Error: Live stream already on. Returning.")
+            print(datetime.now().strftime('%H:%M:%S') + " ==> Error: Live stream already on. Returning.")
             return None
 
         # Streaming beginning, set to true
         self.streaming = True
         # If connected and not already streaming, begin live stream
-        print("==> Displaying live feed")
+        print(datetime.now().strftime('%H:%M:%S') + " ==> Displaying live feed")
 
         # Return thread to update livestream
         Thread(target=self.fetchframe, args=(), daemon=True).start()
@@ -124,11 +126,13 @@ class Camera(object):
         self.recording = False
 
     def msg_connected(self):
-        print("==> Camera connected")
+        width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(datetime.now().strftime('%H:%M:%S') + " ==> Camera connected. Resolution (" + str(width) + " x " + str(height) + ")" )
         self.connected = True
 
     def msg_disconnected(self):
-        print("==> Camera disconnected")
+        print(datetime.now().strftime('%H:%M:%S') + " ==> Camera disconnected")
         self.connected = False
 
     def rescale(self, frame, scale):
@@ -144,6 +148,7 @@ class Canon(Camera):
 # Camera function for traditional webcams
 class Logi(Camera):
     def connect(self,camera_id=0):
+        self.camera_id = camera_id
         if(self.connected):
             return True
         else:
@@ -151,12 +156,13 @@ class Logi(Camera):
                 self.camera = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
                 self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 3840.0)
                 self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160.0)
+                time.sleep(1)
             except:
-                print("==> Error: Cannot open webcam (ID: " + str(camera_id) + "), Please specify integer value")
+                print(datetime.now().strftime('%H:%M:%S') + " ==> Error: Cannot open webcam (ID: " + str(camera_id) + "), Please specify integer value")
                 return False
             # Check camera connected
             if not self.camera.isOpened():
-                print("==> Error: Cannot open webcam (ID: " + str(camera_id) + ")")
+                print(datetime.now().strftime('%H:%M:%S') + " ==> Error: Cannot open webcam (ID: " + str(camera_id) + ")")
                 return False
             else:
                 self.msg_connected()
@@ -165,22 +171,25 @@ class Logi(Camera):
         (_, frame) = self.camera.read()
         # Open live stream
         while self.streaming:
-            scale_percent = 20 # percent of original size
-            width = int(frame.shape[1] * scale_percent / 100)
-            height = int(frame.shape[0] * scale_percent / 100)
-            dim = (width, height)
-            # resize image
-            frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
-            # Rotate view
-            frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
+            try:
+                scale_percent = 20 # percent of original size
+                width = int(frame.shape[1] * scale_percent / 100)
+                height = int(frame.shape[0] * scale_percent / 100)
+                dim = (width, height)
+                # resize image
+                frame = cv2.resize(frame, dim, interpolation = cv2.INTER_AREA)
+                # Rotate view
+                #frame = cv2.rotate(frame, cv2.ROTATE_90_CLOCKWISE)
 
-            cv2.imshow('Input', frame)
-            (_, frame) = self.camera.read()
-            cv2.waitKey(1)
+                cv2.imshow('Input', frame)
+                (_, frame) = self.camera.read()
+                cv2.waitKey(1)
+            except Exception:
+                continue
         self.disconnect()
         # Once finished, destroy windows
         cv2.destroyAllWindows()
-        print("==> Camera auccesfully terminated live stream")
+        print(datetime.now().strftime('%H:%M:%S') + " ==> Camera auccesfully terminated live stream")
 
     def recordvideo(self, savepath=None):
         frames = []
@@ -192,26 +201,29 @@ class Logi(Camera):
         return
 
     # Returns the name of the file it saved
-    def capture(self):
+    def capture(self, bw=False):
         attempts = 0
+        # Initial test grab to ensure params are right
+        (grabbed, frame) = self.camera.read()
         while True:
-            if attempts >= 10:
-                return False
-            # Check for blur here
-            blur = False
+            #blur = False
             (grabbed, frame) = self.camera.read()
             # Check frame for blur
-            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-            if cv2.Laplacian(gray, cv2.CV_64F).var() < 5:
-                blur = True
-                attempts = attempts + 1
-                print(f"==> Image blurred. Attempting recapture {attempts} of 10.")
-                time.sleep(1)
-            # Exit when non blur is found
-            if grabbed and blur == False:
-                attempts = 0
-                return self.savemedia(frame)
-
+            #gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            #if cv2.Laplacian(gray, cv2.CV_64F).var() < 1:
+            #    blur = True
+            #    attempts = attempts + 1
+            #    print(datetime.now().strftime('%H:%M:%S') + f" ==> Image blurred. Attempting recapture {attempts} of 10.")
+            #    time.sleep(1)
+            ## Exit when non blur is found
+            #if (grabbed and blur == False) or attempts >= 10:
+                #attempts = 0
+                #if bw:
+                #    frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                #return self.savemedia(frame)
+            if bw:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            return self.savemedia(frame)
 
     def disconnect(self):
         self.camera.release()

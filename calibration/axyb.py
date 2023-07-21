@@ -8,16 +8,33 @@ https://github.com/pszjg
 from calibration import functions as functions
 import configparser
 import numpy as np
+import glob
 import os
 import glob
 import re
 
+
+def estimateY(config):
+    np.set_printoptions(suppress=True)
+    path = config['calibration']['tt']
+    totalX = []
+    for X in glob.glob(path + "*\\*\\X.txt",recursive = True):
+            totalX.append(np.loadtxt(X))
+
+    print(np.asarray(totalX))
+    print("---------------")
+    print(np.mean(totalX, axis=0))
+
 class AXYB(object):
-    def __init__(self, config):
+    def __init__(self, config, source):
         np.set_printoptions(suppress=True)
         # axyb path
-        self.working_dir = config['model']['working_dir']
-        self.txt_path = config['calibration']['working_dir'] + '\\axyb\\'
+        if source:
+            self.working_dir = source
+            self.txt_path = source + '\\axyb\\'
+        else:
+            self.working_dir = config['model']['working_dir']
+            self.txt_path = config['calibration']['working_dir'] + '\\axyb\\'
         # Check if path exists
         if not os.path.exists(self.txt_path):
             print("==> Error, calibration path '" + self.txt_path + "' does not exist")
@@ -38,7 +55,7 @@ class AXYB(object):
         # Check equal files have been found
         if len(a_files) != len(b_files):
             print("==> Error loading calibration files. There are not and equal number of A and B files.")
-            return None
+            exit()
 
         # Number of files
         self.files = len(a_files)
@@ -79,15 +96,6 @@ class AXYB(object):
         x = np.concatenate((u[1:4, diagonal_s], u[0,diagonal_s]), axis=None)
         y = np.concatenate((v[1:4, diagonal_s], v[0,diagonal_s]), axis=None)
 
-
-        # Backup
-        #diagonal = np.zeros(shape=(s.shape[0],s.shape[0]))
-        #np.fill_diagonal(diagonal, s)
-        #diagonal_s = min(self.files - s)
-
-        # Old
-        #x = [u[1, int(diagonal_s)], u[2, int(diagonal_s)], u[3, int(diagonal_s)], u[0, int(diagonal_s)]]
-        #y = [v[1, int(diagonal_s)], v[2, int(diagonal_s)], v[3, int(diagonal_s)], v[0, int(diagonal_s)]]
 
         M_x = functions.q2rot(x)
         M_y = functions.q2rot(y)
@@ -144,6 +152,8 @@ class AXYB(object):
         # Variables
         rError = np.empty([3,3])
         tError = np.zeros([3])
+        tErrorAll = np.array([])
+        rErrorAll = np.array([])
         counter = 0
         for file in os.listdir(self.txt_path):
             if file.startswith("A0") and os.path.exists(self.txt_path + file.replace("A0","B0")):
@@ -163,11 +173,17 @@ class AXYB(object):
                 tError = tError + (AValidation[0:3, 3] - A[0:3, 3])
                 rError = rError + (AValidation[0:3, 0:3] - A[0:3, 0:3])
 
+                tErrorAll = np.append(tErrorAll,[(AValidation[0:3, 3] - A[0:3, 3])])
+                rErrorAll = np.append(rError,[(AValidation[0:3, 0:3] - A[0:3, 0:3])])
+
 
         if counter > 0:
             print("==> Following values should be 0 to show estimation is be calculated the same")
 
-            rotationError = np.round((rError * 57.2958) / counter, 5)
+
+            #print(tErrorAll.reshape(-1,3))
+
+            rotationError = np.round((rError) / counter, 5)
             totalError = np.round(np.sum(np.absolute(rotationError)), 5)
             print("Rotation Error Total: "  + str(totalError) + "\n" + str(rotationError) + "")
             np.savetxt(self.txt_path + "\\rError.txt", rotationError, fmt='%.6f')
@@ -178,11 +194,11 @@ class AXYB(object):
             np.savetxt(self.txt_path + "\\tError.txt", translationError, fmt='%.6f')
 
 
-def run():
+def run(source=None):
     config = configparser.ConfigParser()
     config.read("./config.ini")
     # Initialise
-    axyb = AXYB(config)
+    axyb = AXYB(config, source)
     # Load files
     axyb.load()
     # Calculate dornaika

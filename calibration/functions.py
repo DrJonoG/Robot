@@ -19,6 +19,7 @@ def rotZ(angle):
 
     return R
 
+
 # Converts rotation matrix to Quaternion
 def rot2q(R):
     q = np.zeros(4)

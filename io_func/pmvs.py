@@ -54,7 +54,7 @@ class PMVS(object):
         imgCount = len(os.listdir(self.imageDir))
         # Create option file
         with open(self.coreDir + '/option.txt', 'w+') as f:
-            f.write(f"level 1 csize 1 threshold 0.7 wsize 7 minImageNum 4 CPU 10 useVisData 0 sequence -1 timages -1 0 {imgCount} oimages 0")
+            f.write(f"level 0 csize 2 threshold 0.7 wsize 11 minImageNum 4 CPU 2 useVisData 0 sequence -1 timages -1 0 {imgCount} oimages 0")
 
         # Check top line is 'CONTOUR'
         for filename in os.listdir(self.txtDir):

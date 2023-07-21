@@ -3,7 +3,7 @@ import time
 import random
 import numpy as np
 # Captures
-def capture(robot, cam, turntable, image_path, axyb_path, positionPath):
+def capture(robot, cam, turntable, image_path, axyb_path, positionPath, positions):
 
     # Inform user
     print("==> Calibrating. Saving files to " + positionPath)
@@ -18,8 +18,7 @@ def capture(robot, cam, turntable, image_path, axyb_path, positionPath):
 
     # TODO
     np.set_printoptions(formatter={'float': lambda x: "%.5f" % (x,)})
-    tempPath = positionPath + "\positionLog.txt"
-    robotPositions = np.loadtxt(tempPath, delimiter=',')
+    robotPositions = np.loadtxt(positions, delimiter=',')
 
     #robotPositionsAdjust = []
     #for i in range(0,2):
@@ -34,7 +33,7 @@ def capture(robot, cam, turntable, image_path, axyb_path, positionPath):
         # Pause for robot to stop moving
         time.sleep(4)
         # Capture image
-        currentFile = cam.capture()
+        currentFile = cam.capture(True)
         # Calculate robot transformation matrix
         robotMatrix = robot.angles_to_transformation()
         # Write matrix
@@ -46,10 +45,9 @@ def capture(robot, cam, turntable, image_path, axyb_path, positionPath):
 
 # Function to obtain positions for the calibration of the turntable
 # Seperate method to acquistion due to different goals
-def turntableCalibration(robot, cam, maxpositions, positionPath):
+def turntableCalibration(robot, cam, maxpositions, positionPath, positions):
     # Todo actively search for checkerboard positions
     np.set_printoptions(formatter={'float': lambda x: "%.5f" % (x,)})
-    tempPath = positionPath + "\positionLog.txt"
-    robotPositions = np.loadtxt(tempPath, delimiter=',')
+    robotPositions = np.loadtxt(positions, delimiter=',')
     # Limit the return
     return robotPositions#[0:maxpositions]
