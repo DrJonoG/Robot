@@ -451,7 +451,6 @@ class calibrateCamera(object):
 
 
                 # Saving the final output
-                print("==> saved to " + targetFolder + filename)
                 input_image.save(targetFolder + filename)
                 input_image.close()
 

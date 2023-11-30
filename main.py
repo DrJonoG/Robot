@@ -74,11 +74,6 @@ class main(object):
             'robot.home':[[self.robot.connect],[self.robot.home]],
             'robot.open': [[self.robot.connect],[self.robot.open]],
             'robot.close': [[self.robot.connect],[self.robot.close]],
-            'calib.axyb': [
-                #[self.camCalibration.calibrate],
-                [AXYB.estimateY, self.config],
-                #[self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
-            ],
             'calib.turntable': [
                 [self.cam.connect],
                 #[self.cam.livestream],
@@ -88,17 +83,6 @@ class main(object):
                 [self.ttCalibration.calibrate],
                 [self.ttCalibration.estimateCenter],
                 [self.camCalibration.averageIntrinsics],
-            ],
-            'calib.tt': [
-                [self.cam.connect],
-                #[self.cam.livestream],
-                [self.robot.connect],
-                [self.turntable.connect],
-                [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
-                [self.ttCalibration.calibrateAtAngle, 0, '0'],
-                [self.ttCalibration.calibrateAtAngle, 45, '1'],
-                [self.ttCalibration.calibrateAtAngle, 90, '2'],
-
             ],
             'calib.camera': [
                 [self.cam.connect],
@@ -115,9 +99,8 @@ class main(object):
                 [self.robot.connect],
                 [self.robot.home],
             ],
-            'calib.robot': [
+            'calib': [
                 [self.cam.connect],
-                #[self.cam.livestream],
                 [self.robot.connect],
                 [self.turntable.connect],
                 [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
@@ -134,7 +117,12 @@ class main(object):
                 [self.turntable.connect],
                 [self.ttCalibration.initialise, self.robot, self.cam, self.turntable],
                 [self.ttCalibration.calibrate],
-                [self.ttCalibration.estimateCenter]
+                [self.ttCalibration.estimateCenter],
+                [self.camCalibration.capture, self.robot, self.cam, self.turntable],
+                [self.camCalibration.calibrate],
+                [AXYB.run],
+                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"],
+                [self.exit_app],
             ],
             'robot.move' : [
                 [self.robot.connect],
@@ -151,9 +139,8 @@ class main(object):
                 [self.PMVS.run],
                 [Filter.filterPoints,  self.config['model']['working_dir'] + r'\models\option.txt.ply', self.config['model']['working_dir'] + r'\models\filtered.ply', self.config]
             ],
-            'model.capture': [
+            'image': [
                 [self.cam.connect],
-                [self.cam.livestream],
                 [self.robot.connect],
                 [self.turntable.connect],
                 [self.modelling.initialise, self.robot, self.cam, self.turntable, self.config],
@@ -170,18 +157,6 @@ class main(object):
                 [self.PMVS.createFiles],
                 [self.PMVS.run],
                 [Filter.filterPoints,  self.config['model']['working_dir'] + r'\models\option.txt.ply', self.config['model']['working_dir'] + r'\models\filtered.ply', self.config]
-            ],
-            'undist': [
-                [IO.undistort, self.config['model']['working_dir'] + "\\images\\", self.config['model']['working_dir'] + "\\visualize\\", self.config]
-            ],
-            'test': [
-                [Filter.filterPoints,  r'I:\calibration7\testmodel\models\option.txt.ply',r'I:\calibration7\testmodel\models\filtered.txt.ply', self.config]
-            ],
-            'est': [
-                [self.ttCalibration.estimateCenter]
-            ],
-            'a': [
-                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"]
             ],
             'config': [
                 [self.printConfig]

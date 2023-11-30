@@ -126,9 +126,20 @@ class Camera(object):
         self.recording = False
 
     def msg_connected(self):
-        width = int(self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(datetime.now().strftime('%H:%M:%S') + " ==> Camera connected. Resolution (" + str(width) + " x " + str(height) + ")" )
+        print("************* Camera Settings *************")
+        print("Width         ",self.camera.get(cv2.CAP_PROP_FRAME_WIDTH))
+        print("Height        ",self.camera.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print("Framerate     ",self.camera.get(cv2.CAP_PROP_FPS))
+        print("Format        ",self.camera.get(cv2.CAP_PROP_FORMAT))
+        print("Brightness    ",self.camera.get(cv2.CAP_PROP_BRIGHTNESS))
+        print("Contrast      ",self.camera.get(cv2.CAP_PROP_CONTRAST))
+        print("Saturation    ",self.camera.get(cv2.CAP_PROP_SATURATION))
+        print("Gain          ",self.camera.get(cv2.CAP_PROP_GAIN))
+        print("Hue           ",self.camera.get(cv2.CAP_PROP_HUE))
+        print("Exposure      ",self.camera.get(cv2.CAP_PROP_EXPOSURE))
+        print("*******************************************")
+
+        print(datetime.now().strftime('%H:%M:%S') + " ==> Camera connected." )
         self.connected = True
 
     def msg_disconnected(self):
@@ -154,9 +165,24 @@ class Logi(Camera):
         else:
             try:
                 self.camera = cv2.VideoCapture(camera_id, cv2.CAP_DSHOW)
+                self.camera.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'))
                 self.camera.set(cv2.CAP_PROP_FRAME_WIDTH, 3840.0)
                 self.camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 2160.0)
-                time.sleep(1)
+                #self.camera.set(cv2.CAP_PROP_AUTOFOCUS, 1) # turn the autofocus on
+
+                #time.sleep(5)
+
+                #self.camera.set(cv2.CAP_PROP_AUTOFOCUS, 0)
+                self.camera.set(cv2.CAP_PROP_EXPOSURE, -6)
+                self.camera.set(cv2.CAP_PROP_GAIN, 120)
+                self.camera.set(cv2.CAP_PROP_HUE, -5)
+                self.camera.set(cv2.CAP_PROP_SATURATION, 128)
+                self.camera.set(cv2.CAP_PROP_CONTRAST, 128)
+                self.camera.set(cv2.CAP_PROP_BRIGHTNESS, 128)
+
+                time.sleep(3)
+
+
             except:
                 print(datetime.now().strftime('%H:%M:%S') + " ==> Error: Cannot open webcam (ID: " + str(camera_id) + "), Please specify integer value")
                 return False
