@@ -165,6 +165,7 @@ class calibrateTurntable(object):
 
         # Loop through each image (robot position)
         for filename in os.listdir(self.path + "\\0\\axyb\\"):
+            #if imageCount >= 30: continue
             if 'intrinsic' in filename or 'dist' in filename:
                 continue
             # Empty arrays
@@ -202,6 +203,7 @@ class calibrateTurntable(object):
             # Normalise
             for x in range(0, numLines):
                 PAn = math.sqrt((Si[x, 0] * Si[x, 0]) + (Si[x, 1] * Si[x, 1]) + (Si[x, 2] * Si[x, 2]))
+                if PAn == 0.0: continue
                 Si[x, 0] = Si[x, 0] / PAn;
                 Si[x, 1] = Si[x, 1] / PAn;
                 Si[x, 2] = Si[x, 2] / PAn;

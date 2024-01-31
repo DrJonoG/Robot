@@ -31,7 +31,7 @@ def capture(robot, cam, turntable, image_path, axyb_path, positionPath, position
         # Move robot to position
         robot.move(robotPositions[i])
         # Pause for robot to stop moving
-        time.sleep(4)
+        time.sleep(1)
         # Capture image
         currentFile = cam.capture(True)
         # Calculate robot transformation matrix

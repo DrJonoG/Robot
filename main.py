@@ -69,7 +69,7 @@ class main(object):
             'cam.capture': [[self.cam.connect],[self.cam.capture]],
             'turntable.home': [[self.turntable.connect], [self.turntable.Home]],
             'turntable.connect': [[self.turntable.connect]],
-            'turntable.goto': [[self.turntable.connect], [self.turntable.GoTo, 30]],
+            'turntable.goto': [[self.turntable.connect], [self.turntable.GoTo, 180]],
             'robot.connect':[[self.robot.connect]],
             'robot.home':[[self.robot.connect],[self.robot.home]],
             'robot.open': [[self.robot.connect],[self.robot.open]],
@@ -160,7 +160,14 @@ class main(object):
             ],
             'config': [
                 [self.printConfig]
-            ]
+            ],
+            'calib.existing': [
+                [self.camCalibration.calibrate],
+                [AXYB.run],
+                [self.camCalibration.estimateA,  self.config['calibration']['working_dir'] + "\\images\\", self.config['calibration']['working_dir'] + "\\axyb\\", self.config['calibration']['working_dir'] + "\\projected\\"],
+                [self.exit_app],
+            ],
+
         }
         iter = True
 

@@ -64,6 +64,9 @@ class ImageAcquisition():
                 # Image output
                 self.testFolder = self.config['model']['working_dir'] + '\\B\\'
                 if not os.path.exists(self.testFolder):   os.makedirs(self.testFolder)
+                # Image output
+                self.testImageFolder = self.config['model']['working_dir'] + '\\OriginProjections\\'
+                if not os.path.exists(self.testImageFolder):   os.makedirs(self.testImageFolder)
                 # Original estimate of A output
                 self.aFolder = self.config['model']['working_dir'] + '\\A\\'
                 if not os.path.exists(self.aFolder):     os.makedirs(self.aFolder)
@@ -156,6 +159,11 @@ class ImageAcquisition():
 
                 # Calculate and save A
                 A = np.dot(self.X, functions.matrix_inverse(np.dot(Y, B)))
+                # Add error
+                if self.config['calibration']['add_error'] == "True":
+                    A[0:3,3] = A[0:3,3] + self.tError
+                    A[0:3,0:3] = A[0:3,0:3] + self.rError
+                # Estimate projection matrix and save
                 np.savetxt(self.aFolder + currentFile + '.txt', A, fmt='%1.5f')
 
                 # Estimate projection matrix and save
@@ -175,28 +183,10 @@ class ImageAcquisition():
                 input_image = Image.open(self.imageFolder + currentFile + '.jpg')
                 # Draw ellipse
                 draw = ImageDraw.Draw(input_image)
-                draw.ellipse((x-5, y-5, x+5, y+5), fill=(255,0,0,0))
+                draw.ellipse((x-5, y-5, x+5, y+5), fill=(255,0,0))
 
-                # Adjust for error if exists
-                if self.rError is not None and self.tError is not None:
-                    A[0:3,3] = A[0:3,3] + self.tError
-                    A[0:3,0:3] = A[0:3,0:3] + self.rError
 
-                    # Estimate projection matrix and save
-                    matrix = np.dot(self.intrinsic, A[0:3,:])
-
-                    # Output projection (for testing purposes only)
-                    projectPoint =np.array([0,0,0,1])
-
-                    # Project point to camera
-                    v = (matrix @ projectPoint) # dot product
-                    x = int(v[0,0] / v[0,2])
-                    y = int(v[0,1] / v[0,2])
-
-                    # Draw ellipse
-                    draw.ellipse((x-5, y-5, x+5, y+5), fill=(0,0,255,0))
-
-                input_image.save(self.testFolder + currentFile + '.jpg')
+                input_image.save(self.testImageFolder + currentFile + '.jpg')
                 input_image.close()
 
         self.cam.path = original

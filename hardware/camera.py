@@ -6,10 +6,13 @@ import numpy as np
 from PIL import Image, ImageDraw
 from threading import Thread
 from datetime import datetime
+import subprocess
 
 def fetchClass(cameraType, config):
     if cameraType.lower() == 'logi':
         return Logi(config)
+    if cameraType.lower() == 'canon':
+        return Canon(config)
 
 class Camera(object):
     """
@@ -56,6 +59,7 @@ class Camera(object):
         self.recording = False
         self.config = config
         self.path = self.config['camera']['save_path']
+        self.digiPath = self.config['digiCam']['digiCamPath']
 
     def connect(self, id="0"):
         raise NotImplementedError("camera.connect has not been implemented")
@@ -153,7 +157,39 @@ class Camera(object):
 
 
 class Canon(Camera):
-    pass
+    # Cannon implementation currently uses subprocess to run digiCam software
+    # Canon SDK unavailable in UK and also unavailable for Windows Python implementations
+    # Will implement in the future TODO
+
+    def connect(self, camera_id=0):
+        print(datetime.now().strftime('%H:%M:%S') + "==> Method unavailable with DigiCam implmentation")
+
+    def savemedia(self, media, type="image"):
+        print(datetime.now().strftime('%H:%M:%S') + "==> Method unavailable with DigiCam implmentation")
+
+    def livestream(self):
+        print(datetime.now().strftime('%H:%M:%S') + "==> Method unavailable with DigiCam implmentation")
+
+    def disconnect(self):
+        print(datetime.now().strftime('%H:%M:%S') + "==> Method unavailable with DigiCam implmentation")
+
+    def fetchframe(self):
+        print(datetime.now().strftime('%H:%M:%S') + "==> Method unavailable with DigiCam implmentation")
+
+
+    def capture(self, bw=False):
+        if not os.path.exists(self.path):
+            os.makedirs(self.path)
+        # Count number of jpg images to name files correctly.
+        numFiles = len(glob.glob1(self.path,"*.jpg"))
+        file_name = str(numFiles).zfill(8)
+
+        savePath = self.path + file_name + ".jpg"
+        subprocess.call(f'"{self.digiPath}" /filename "{savePath}" /capturenoaf', shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+        return file_name
+
+
 
 
 # Camera function for traditional webcams

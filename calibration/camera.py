@@ -26,6 +26,7 @@ class calibrateCamera(object):
         self.cb_w = int(self.config['calibration']['cb_width'])
         self.cb_h = int(self.config['calibration']['cb_length'])
         self.cb_size = float(self.config['calibration']['cb_size'])
+        self.distort = self.config['calibration']['distort']
         # Create necessary folders
         self.create_folders([self.image_destination, self.output_destination, self.axyb_destination, self.projection_destination, self.projected_destination])
         # custom intrinsic parameters
@@ -78,6 +79,9 @@ class calibrateCamera(object):
             if not os.path.exists(path):
                 os.makedirs(path)
 
+
+    def reorderFolders():
+        pass
 
     # Output path is the same as input, the output is a series of transformation matrices
     def calibrate(self):
@@ -133,13 +137,14 @@ class calibrateCamera(object):
             if ret == True:
                 objpoints.append(objp * float(self.cb_size))
                 # Sub pixel corners
-                corners2 = cv2.cornerSubPix(gray,corners,(9,9),(-1,-1),criteria)
+                corners2 = cv2.cornerSubPix(gray,corners,(11,11),(-1,-1),criteria)
                 imgpoints.append(corners2)
                 found += 1
 
                 # Draw and display the corners
-                # img = cv2.drawChessboardCorners(img, (self.cb_w,self.cb_h), corners2,ret)
-                # cv2.imwrite(self.output_destination + "/projected/corners_" + str(i) + ".jpg", img)
+                if self.config['general']['testing'] == "True":
+                    img = cv2.drawChessboardCorners(img, (self.cb_w,self.cb_h), corners2,ret)
+                    cv2.imwrite(self.projected_destination + "/corners_" + str(i) + ".jpg", img)
 
                 # Assign to image set
                 self.images.append(self.imageInitial[i])
@@ -201,24 +206,32 @@ class calibrateCamera(object):
         sampleImage = cv2.imread(self.images[0])
         # Get the dimensions of the image
         height, width = sampleImage.shape[:2]
+
         # Extracting camera parameters
         # distCoeffs Output vector of distortion coefficients [k1,k2,p1,p2,k3,k4,k5,k6,s1,s2,s3,s4,taux,tauy] of 4, 5, 8, 12 or 14 elements.
+        if self.config['calibration']['est_intrinsic'] == "True":
+            print("==> Estimating intrinsic parameters")
+            retval, intrinsicMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None, flags=cv2.CALIB_RATIONAL_MODEL + cv2.CALIB_THIN_PRISM_MODEL)
+            # For defining intrin
+        elif self.config['calibration']['est_intrinsic'] == "False":
+            print("==> Intrinsic parameters provided")
+            retval, intrinsicMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], self.customIntrin, None, flags=cv2.CALIB_USE_INTRINSIC_GUESS +  cv2.CALIB_FIX_PRINCIPAL_POINT + cv2.CALIB_FIX_FOCAL_LENGTH )
 
-        #retval, intrinsicMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], None, None, flags=cv2.CALIB_RATIONAL_MODEL + cv2.CALIB_THIN_PRISM_MODEL)
-        # For defining intrin
-        retval, intrinsicMatrix, distCoeffs, rvecs, tvecs = cv2.calibrateCamera(objpoints, imgpoints, gray.shape[::-1], self.customIntrin, None, flags=cv2.CALIB_USE_INTRINSIC_GUESS )
-        # Save intrinsic
-        np.savetxt(self.axyb_destination + "/intrinsic.txt", intrinsicMatrix,  fmt='%.8f')
-
+        # save dist
+        np.savetxt(self.axyb_destination + "/distCoeffs.txt", distCoeffs,  fmt='%.8f')
 
         # Refine camera matrix
         # Returns optimal camera matrix and a rectangular region of interest
         optimalIntrinsicMatrix, roi = cv2.getOptimalNewCameraMatrix(intrinsicMatrix, distCoeffs, (width,height), 1, (width,height))
+        # Save intrinsic
+        np.savetxt(self.axyb_destination + "/intrinsicOptimised.txt", optimalIntrinsicMatrix,  fmt='%.8f')
+        np.savetxt(self.axyb_destination + "/intrinsic.txt", intrinsicMatrix,  fmt='%.8f')
 
 
         ###
         # ESTIMATE ERROR
         ###
+
         mean_error = 0
         # Estimate accuracy
         for i in range(len(objpoints)):
@@ -229,37 +242,29 @@ class calibrateCamera(object):
 
         images = glob.glob(self.image_destination + '*.jpg')
 
-        for fname in images:
-            img = cv2.imread(fname)
-            h,  w = img.shape[:2]
-            newcameramtx, roi = cv2.getOptimalNewCameraMatrix(intrinsicMatrix, distCoeffs, (width,height), 1, (width,height))
-
-            # undistort
-            dst = cv2.undistort(img, intrinsicMatrix, distCoeffs, None, newcameramtx)
-            # crop the image
-            x, y, w, h = roi
-            dst = dst[y:y+h, x:x+w]
-            out_name = os.path.basename(fname)
-            cv2.imwrite(self.output_destination + "\\testing\\" + out_name, dst)
-
-
-        mean_error = 0
-        for i in range(len(objpoints)):
-            imgpoints2, _ = cv2.projectPoints(objpoints[i], rvecs[i], tvecs[i], intrinsicMatrix, distCoeffs)
-            error = cv2.norm(imgpoints[i], imgpoints2, cv2.NORM_L2)/len(imgpoints2)
-            mean_error += error
-
-        print(datetime.now().strftime('%H:%M:%S') + f"==> Estimated error after adjustment (pixels): {round(mean_error/len(objpoints),4)}")
-
-
-        np.savetxt(self.axyb_destination + "/intrinsicOptimised.txt", optimalIntrinsicMatrix,  fmt='%.8f')
-        np.savetxt(self.axyb_destination + "/distCoeffs.txt", distCoeffs,  fmt='%.8f')
-
-
+        if self.distort == "True":
+            for fname in images:
+                img = cv2.imread(fname)
+                # undistort
+                dst = cv2.undistort(img, intrinsicMatrix, distCoeffs, None, optimalIntrinsicMatrix)
+                # crop the image
+                x, y, w, h = roi
+                dst = dst[y:y+h, x:x+w]
+                # Get file name
+                out_name = os.path.basename(fname)
+                # Save cropped
+                cv2.imwrite(self.projected_destination + out_name, dst)
+        else:
+            for fname in images:
+                img = cv2.imread(fname)
+                out_name = os.path.basename(fname)
+                cv2.imwrite(self.projected_destination + out_name, img)
         ###
         # OUTPUT VERIFICATION
         ###
         counter = 0
+        # Point to project
+        point = [0,0,0,1]
         # Export the camera matrices
         for i in range(0, len(images)):
             # Check if checkerboard is visible
@@ -272,45 +277,45 @@ class calibrateCamera(object):
             projection_matrix = np.dot(intrinsicMatrix, A)
             projection_matrix = np.append(projection_matrix, [[0, 0, 0, 1]], axis=0)
 
+            # Calculate optimal
+            projection_matrix_optimal = np.dot(optimalIntrinsicMatrix, A)
+            projection_matrix_optimal = np.append(projection_matrix_optimal, [[0, 0, 0, 1]], axis=0)
+
             # Camera matrix
             A = np.append(A, [[0, 0, 0, 1]], axis=0)
             # Save files
             np.savetxt(self.axyb_destination + "/A" + file_name + ".txt", A,  fmt='%.8f')
             np.savetxt(self.projection_destination + file_name + ".txt", projection_matrix,  fmt='%.8f')
 
-            # If testing output projected
+            # If testing output projected origin based on camera estimate
             if self.config['general']['testing'] == "True":
-                # Load
-                imgToAdapt = cv2.imread(images[i])
-                # Undistort image
-                undistorted_image = imgToAdapt#cv2.undistort(imgToAdapt, intrinsicMatrix, distCoeffs, None, optimalIntrinsicMatrix)
-                # Save image
-                cv2.imwrite(self.projected_destination + "\\" + file_name + ".jpg", undistorted_image)
                 # Load image as PIL
-                input_image = Image.open(self.projected_destination + "\\" + file_name + ".jpg")
+                input_image = Image.open(self.projected_destination + "\\"  + file_name  + ".jpg")
 
-                point = [0,0,0,1]
-                # Project point to camera
+                # Project point to camera using original
                 v = projection_matrix @ point # dot product
                 x = int(v[0] / v[2])
                 y = int(v[1] / v[2])
                 # Draw ellipse
                 draw = ImageDraw.Draw(input_image)
-                draw.ellipse((x-5, y-5, x+5, y+5), fill=(255,0,0,0))
+                draw.ellipse((x-5, y-5, x+5, y+5), fill=(0,255,0))
+
                 # Saving the final output
-                input_image.save(self.projected_destination + "\\" + file_name + ".jpg")
+                input_image.save(self.projected_destination + "\\"  + file_name + ".jpg" )
                 input_image.close()
 
-
+                ##################################################################
 
             counter = counter + 1
 
 
-    def estimateA(self, imageFolder, calibrationFolder, targetFolder, degrees=0):
+
+
+    def estimateA(self, imageFolder, calibrationFolder, targetFolder):
         Y = np.loadtxt(calibrationFolder + "Y.txt")
         X = np.loadtxt(calibrationFolder + "X.txt")
         intrinsic = np.loadtxt(calibrationFolder + "intrinsic.txt")
-        #ttCenter = np.loadtxt(calibrationPath + "center.txt")
+        #ttCenter = np.loadtxt(calibrationFolder + "center.txt")
         rError = np.loadtxt(calibrationFolder + '\\rError.txt')
         tError = np.loadtxt(calibrationFolder + '\\tError.txt')
         distCoeffs = np.loadtxt(calibrationFolder + '\\distCoeffs.txt')
@@ -321,94 +326,13 @@ class calibrateCamera(object):
             if os.path.isfile(f):
                 B = np.loadtxt(calibrationFolder + "B" + filename.replace(".jpg",".txt"))
 
-                if degrees > 0:
-                    # Convert to rads
-                    radians = (degrees * 0.0174532925)
-                    # get rotation of Y estimate
-                    estY = (Y @ functions.rotZ(radians))
-                    # Difference in translation
-                    ttCenter[2] = 0
-                    cPoint = ttCenter * -1
-                    cPoint = np.append(cPoint, [1])
-                    point = (functions.rotZ(radians) @ cPoint)
-
-                    #point = (functions.rotZ(radians) * cPoint)
-                    #point = point[0:4,3]
-
-                    # calculate translation back to origin
-                    point[0:3] = point[0:3] + ttCenter
-
-                    # translate to origin
-                    tempVec =  (functions.matrix_inverse(Y) @ point)
-
-                    # Create Y
-                    estY[0:3,3] = tempVec[0:3]
-
-                    # Invert back to final Y
-                    YFinal =  functions.matrix_inverse(estY)
-                else:
-                    YFinal = Y
-
+                YFinal = Y
 
                 # Calculate and save A if testing, else not needed
                 A = (X @ functions.matrix_inverse((YFinal @ B)))
 
-
                 # Output projection (for testing purposes only)
                 projectPoint =np.array([0,0,0,1])
-
-                ###############################################################################################################
-                ###############################################################################################################
-                ###################################### Projection to undistorted image ########################################
-                ###############################################################################################################
-                # original = cv2.imread(imageFolder + "\\" + filename)
-                # dst = cv2.undistort(original, optimal, distCoeffs, None, None)
-                # cv2.imwrite(self.projected_destination + "\\" + filename.replace(".jpg","_dist.jpg"), dst)
-                #
-                # # Estimate projection matrix and save
-                # matrix = np.dot(intrinsic, A[0:3,:])
-                #
-                # # Project point to camera
-                # v = (matrix @ projectPoint) # dot product
-                # x = int(v[0] / v[2])
-                # y = int(v[1] / v[2])
-                #
-                # # Load image as PIL
-                # input_image = Image.open(self.projected_destination + "\\" + filename.replace(".jpg","_dist.jpg"))
-                #
-                # # Draw ellipse
-                # draw = ImageDraw.Draw(input_image)
-                # draw.ellipse((x-5, y-5, x+5, y+5), fill=(0,0,255,0))
-                #
-                # # Adjust for error if exists
-                # if rError is not None and tError is not None:
-                #     A[0:3,3] = A[0:3,3] + tError
-                #     A[0:3,0:3] = A[0:3,0:3] + rError
-                #
-                #     # Estimate projection matrix and save
-                #     matrix = np.dot(optimal, A[0:3,:])
-                #
-                #     # Output projection (for testing purposes only)
-                #     projectPoint =np.array([0,0,0,1])
-                #
-                #     # Project point to camera
-                #     v = (matrix @ projectPoint) # dot product
-                #     x = int(v[0] / v[2])
-                #     y = int(v[1] / v[2])
-                #
-                #     # Draw ellipse
-                #     draw = ImageDraw.Draw(input_image)
-                #     draw.ellipse((x-5, y-5, x+5, y+5), fill=(0,255,0,0))
-                #
-                #
-                # # Saving the final output
-                # print("==> saved to " + targetFolder + filename.replace(".jpg","_dist.jpg"))
-                # input_image.save(targetFolder + filename.replace(".jpg","_dist.jpg"))
-                # input_image.close()
-
-                ####### END
-                ###############################################################################################################
-                ###############################################################################################################
 
                 # Estimate projection matrix and save
                 matrix = (intrinsic @ A[0:3,:])
@@ -419,20 +343,17 @@ class calibrateCamera(object):
                 y = int(v[1] / v[2])
 
                 # Load image as PIL
-                input_image = Image.open(imageFolder + "\\" + filename)
+                input_image = Image.open(self.projected_destination + "\\" + filename)
 
                 # Draw ellipse
                 draw = ImageDraw.Draw(input_image)
-                draw.ellipse((x-5, y-5, x+5, y+5), fill=255)
-
+                draw.ellipse((x-5, y-5, x+5, y+5), fill=(125,125,125))
 
                 # Estimate using error
-
                 # Adjust for error if exists
                 if rError is not None and tError is not None:
                     A[0:3,3] = A[0:3,3] + tError
                     A[0:3,0:3] = A[0:3,0:3] + rError
-
                     # Estimate projection matrix and save
                     matrixErr = np.dot(intrinsic, A[0:3,:])
 
@@ -446,12 +367,10 @@ class calibrateCamera(object):
 
                     # Draw ellipse
                     draw = ImageDraw.Draw(input_image)
-                    draw.ellipse((x-5, y-5, x+5, y+5), fill=255)
-
-
+                    draw.ellipse((x-5, y-5, x+5, y+5), fill=(0,0,255))
 
                 # Saving the final output
-                input_image.save(targetFolder + filename)
+                input_image.save(self.projected_destination + "\\" + filename)
                 input_image.close()
 
 
